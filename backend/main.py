@@ -274,7 +274,7 @@ def obtener_macro(
 
 
 # ── ENDPOINT 13: COMPARAR ACTIVOS ─────────────────────────────────────────────
-@app.post("/comparar", tags=["Comparación"])
+@app.get("/comparar", tags=["Comparación"])
 def comparar(
     tickers: List[str] = Query(
         default=["AAPL","SAP.DE","TM","EC"],
