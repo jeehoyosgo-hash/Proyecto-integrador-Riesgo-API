@@ -1,6 +1,6 @@
 """
-Tablero Streamlit — API de Análisis de Riesgo Financiero
-Conecta directamente con el backend FastAPI en localhost:8000
+Tablero Streamlit v2 — API de Análisis de Riesgo Financiero Global
+30 activos · 4 regiones · 6 sectores
 """
 import streamlit as st
 import requests
@@ -8,49 +8,36 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
 
-# ─────────────────────────────────────────────
-# CONFIGURACIÓN
-# ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="Risk Analytics — USTA",
+    page_title="Risk Analytics v2 — USTA",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 API = "http://localhost:8000"
-ACTIVOS = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
-COLORES = {
-    "AAPL":  "#58a6ff",
-    "MSFT":  "#3fb950",
-    "GOOGL": "#d29922",
-    "AMZN":  "#bc8cff",
-    "TSLA":  "#f85149",
+
+COLORES_REGION = {
+    "Norteamérica": "#58a6ff",
+    "Europa":       "#3fb950",
+    "LatAm":        "#d29922",
+    "Asia":         "#bc8cff",
 }
 
-# ─────────────────────────────────────────────
-# ESTILOS
-# ─────────────────────────────────────────────
 st.markdown("""
 <style>
-  .main { background-color: #0d1117; }
-  .stMetric { background: #161b22; border: 1px solid #21262d; border-radius: 10px; padding: 16px; }
-  .stMetric label { color: #7d8590 !important; font-size: 11px !important; text-transform: uppercase; letter-spacing: 0.08em; }
-  div[data-testid="metric-container"] { background: #161b22; border: 1px solid #21262d; border-radius: 10px; padding: 16px 20px; }
-  .badge-buy  { background: rgba(63,185,80,0.15);  color: #3fb950; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-  .badge-sell { background: rgba(248,81,73,0.15);  color: #f85149; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-  .badge-neu  { background: rgba(125,133,144,0.15);color: #7d8590; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+div[data-testid="metric-container"] {
+    background: #161b22; border: 1px solid #21262d;
+    border-radius: 10px; padding: 16px 20px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# HELPERS
-# ─────────────────────────────────────────────
+
+# ── Helpers ──
 @st.cache_data(ttl=300)
-def get_api(path: str):
-    """GET request a la API con caché de 5 minutos."""
+def get_api(path):
     try:
         r = requests.get(f"{API}{path}", timeout=30)
         r.raise_for_status()
@@ -59,8 +46,7 @@ def get_api(path: str):
         return None, str(e)
 
 @st.cache_data(ttl=300)
-def post_api(path: str, payload: dict):
-    """POST request a la API con caché de 5 minutos."""
+def post_api(path, payload):
     try:
         r = requests.post(f"{API}{path}", json=payload, timeout=60)
         r.raise_for_status()
@@ -69,38 +55,36 @@ def post_api(path: str, payload: dict):
         return None, str(e)
 
 def plotly_theme():
-    """Configuración de tema oscuro para gráficos Plotly."""
-    return dict(
-        template="plotly_dark",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="monospace", size=11, color="#7d8590"),
-        margin=dict(l=10, r=10, t=40, b=10),
-    )
+    return dict(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)", font=dict(family="monospace", size=11),
+                margin=dict(l=10, r=10, t=40, b=10))
 
-# ─────────────────────────────────────────────
-# SIDEBAR
-# ─────────────────────────────────────────────
+def color_region(region):
+    return COLORES_REGION.get(region, "#7d8590")
+
+
+# ── Sidebar ──
 with st.sidebar:
-    st.markdown("## 📈 Risk Analytics")
-    st.markdown("**Teoría del Riesgo — USTA**")
+    st.markdown("## 📈 Risk Analytics v2")
+    st.markdown("**30 activos · 4 regiones · 6 sectores**")
     st.divider()
 
-    # Status API
-    data, err = get_api("/")
-    if data:
-        st.success(f"✓ API conectada · v{data.get('version','?')}")
+    health, err = get_api("/")
+    catalogo, _ = get_api("/catalogo")
+
+    if health:
+        st.success(f"✓ API conectada · {health.get('version','?')}")
     else:
         st.error(f"✗ API desconectada\n{err}")
         st.info("Ejecuta: `python main.py`")
 
     st.divider()
-    pagina = st.radio(
-        "Sección",
-        ["Dashboard", "Precios e Indicadores", "VaR & CVaR",
-         "Markowitz & CAPM", "Señales", "Macroeconómico"],
-        label_visibility="collapsed"
-    )
+
+    pagina = st.radio("Sección", [
+        "Dashboard", "Precios e Indicadores", "VaR & CVaR",
+        "Markowitz & CAPM", "Señales", "Comparar activos",
+        "Recomendaciones", "Macroeconómico"
+    ], label_visibility="collapsed")
 
     st.divider()
     st.markdown(f"<small style='color:#7d8590'>API: `{API}`</small>", unsafe_allow_html=True)
@@ -108,50 +92,60 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
+
 # ════════════════════════════════════════
 # DASHBOARD
 # ════════════════════════════════════════
 if pagina == "Dashboard":
-    st.title("Dashboard — Portafolio de inversión")
+    st.title("Dashboard — Portafolio Global")
 
-    if not data:
-        st.error("No se puede conectar con la API. Asegúrate de que `python main.py` esté corriendo.")
+    if not health or not catalogo:
+        st.error("No se puede conectar con la API.")
         st.stop()
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Activos", len(data.get("activos_disponibles", [])), help="Activos en el portafolio")
-    col2.metric("Estado API", data.get("status", "—").upper())
-    col3.metric("Versión", f"v{data.get('version','?')}")
-    col4.metric("Fuente datos", "Yahoo Finance + FRED")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Activos globales",   catalogo["total_activos"])
+    c2.metric("Regiones",           len(catalogo["regiones"]))
+    c3.metric("Sectores",           len(catalogo["sectores"]))
+    c4.metric("Países",             len(catalogo["paises"]))
 
     st.divider()
 
-    activos_data, err = get_api("/activos")
-    if activos_data:
-        st.subheader("Activos del portafolio")
-        df = pd.DataFrame(activos_data["activos"])
-        st.dataframe(
-            df[["ticker","nombre","sector","moneda"]],
-            use_container_width=True,
-            hide_index=True,
-        )
+    col_f1, col_f2 = st.columns(2)
+    filtro_region = col_f1.selectbox("Filtrar por región", ["Todas"] + catalogo["regiones"])
+    filtro_sector = col_f2.selectbox("Filtrar por sector", ["Todos"] + catalogo["sectores"])
+
+    activos = []
+    for region, lista in catalogo["por_region"].items():
+        for a in lista:
+            activos.append(a)
+
+    if filtro_region != "Todas":
+        activos = [a for a in activos if a["region"] == filtro_region]
+    if filtro_sector != "Todos":
+        activos = [a for a in activos if a["sector"] == filtro_sector]
+
+    st.subheader(f"Catálogo — {len(activos)} activos")
+    df = pd.DataFrame(activos)[["ticker","nombre","sector","pais","region","moneda"]]
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
     st.divider()
-    st.subheader("Endpoints disponibles")
-    endpoints = [
-        ("GET",  "/",                   "Health check del servidor"),
-        ("GET",  "/activos",            "Lista activos del portafolio"),
-        ("GET",  "/precios/{ticker}",   "Precios históricos Yahoo Finance"),
-        ("GET",  "/rendimientos/{ticker}", "Rendimientos simples y logarítmicos"),
-        ("GET",  "/indicadores/{ticker}", "SMA, EMA, RSI, MACD, Bollinger"),
-        ("POST", "/var",                "VaR y CVaR — 3 métodos"),
-        ("GET",  "/capm",               "Beta y rendimiento esperado CAPM"),
-        ("POST", "/frontera-eficiente", "Frontera eficiente de Markowitz"),
-        ("GET",  "/alertas",            "Señales automáticas de trading"),
-        ("GET",  "/macro",              "Indicadores macroeconómicos FRED"),
-    ]
-    df_ep = pd.DataFrame(endpoints, columns=["Método","Ruta","Descripción"])
-    st.dataframe(df_ep, use_container_width=True, hide_index=True)
+    st.subheader("Distribución por región y sector")
+    c_a, c_b = st.columns(2)
+    with c_a:
+        conteo_reg = pd.DataFrame(activos).groupby("region").size().reset_index(name="count")
+        fig = px.pie(conteo_reg, names="region", values="count",
+                     color="region", color_discrete_map=COLORES_REGION,
+                     template="plotly_dark", hole=0.4)
+        fig.update_layout(**plotly_theme(), height=280)
+        st.plotly_chart(fig, use_container_width=True)
+    with c_b:
+        conteo_sec = pd.DataFrame(activos).groupby("sector").size().reset_index(name="count")
+        fig2 = px.bar(conteo_sec, x="sector", y="count", template="plotly_dark",
+                      color="sector", height=280)
+        fig2.update_layout(**plotly_theme())
+        st.plotly_chart(fig2, use_container_width=True)
+
 
 # ════════════════════════════════════════
 # PRECIOS E INDICADORES
@@ -159,189 +153,176 @@ if pagina == "Dashboard":
 elif pagina == "Precios e Indicadores":
     st.title("Precios e Indicadores Técnicos")
 
-    col1, col2, col3 = st.columns([2,2,1])
-    ticker     = col1.selectbox("Activo", ACTIVOS, index=0)
-    fecha_ini  = col2.selectbox("Horizonte", ["2023-01-01","2022-01-01","2020-01-01"],
-                                 index=1, format_func=lambda x: {"2023-01-01":"Último año","2022-01-01":"2 años","2020-01-01":"5 años"}[x])
-    calcular   = col3.button("Calcular", type="primary", use_container_width=True)
+    if not catalogo:
+        st.error("Sin conexión a la API.")
+        st.stop()
 
-    if calcular or True:
-        with st.spinner(f"Descargando datos de {ticker}..."):
-            ind_data, err = get_api(f"/indicadores/{ticker}?fecha_inicio={fecha_ini}")
+    # Construir lista de tickers agrupada por región
+    todos = []
+    for region, lista in catalogo["por_region"].items():
+        for a in lista:
+            todos.append(f"{a['ticker']} — {a['nombre']} ({a['pais']})")
 
-        if err:
-            st.error(f"Error: {err}")
-            st.stop()
+    col1, col2, col3 = st.columns([3, 2, 1])
+    seleccion = col1.selectbox("Activo", todos)
+    ticker    = seleccion.split(" — ")[0]
+    fecha_ini = col2.selectbox("Horizonte",
+                               ["2023-01-01","2022-01-01","2020-01-01"],
+                               index=1,
+                               format_func=lambda x: {"2023-01-01":"1 año","2022-01-01":"2 años","2020-01-01":"5 años"}[x])
+    calcular  = col3.button("Cargar", type="primary", use_container_width=True)
 
-        datos = pd.DataFrame(ind_data["datos"]).dropna(subset=["cierre"])
-        señales = ind_data.get("señales", [])
-        resumen = ind_data.get("resumen", {})
+    with st.spinner(f"Descargando datos de {ticker}..."):
+        ind_data, err = get_api(f"/indicadores/{ticker}?fecha_inicio={fecha_ini}")
 
-        # KPIs
-        precio_actual = datos["cierre"].iloc[-1]
-        precio_inicio = datos["cierre"].iloc[0]
-        cambio_pct    = (precio_actual - precio_inicio) / precio_inicio * 100
-        rsi_actual    = resumen.get("rsi_actual", 0) or 0
-        vols = np.log(datos["cierre"] / datos["cierre"].shift(1)).dropna()
-        vol_anual = vols.std() * np.sqrt(252) * 100
+    if err:
+        st.error(f"Error: {err}")
+        st.stop()
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Precio actual", f"${precio_actual:.2f}", f"{cambio_pct:+.2f}%")
-        c2.metric("RSI actual", f"{rsi_actual:.1f}",
-                  "Sobrecomprado" if rsi_actual > 70 else "Sobrevendido" if rsi_actual < 30 else "Neutral")
-        c3.metric("Volatilidad anual", f"{vol_anual:.1f}%")
-        c4.metric("Observaciones", f"{len(datos)} días")
+    datos    = pd.DataFrame(ind_data["datos"]).dropna(subset=["cierre"])
+    señales  = ind_data.get("señales", [])
+    resumen  = ind_data.get("resumen", {})
 
-        # Señales activas
-        if señales:
-            st.divider()
-            st.subheader("Señales activas")
-            cols = st.columns(len(señales))
-            for i, s in enumerate(señales):
-                with cols[i]:
-                    color = "🟢" if s["tipo"] == "COMPRA" else "🔴"
-                    st.info(f"{color} **{s['tipo']}** — {s['indicador']}\n\n{s['descripcion']}")
+    precio_actual = datos["cierre"].iloc[-1]
+    cambio_pct    = (precio_actual - datos["cierre"].iloc[0]) / datos["cierre"].iloc[0] * 100
+    rsi_actual    = resumen.get("rsi_actual", 0) or 0
+    vols          = np.log(datos["cierre"] / datos["cierre"].shift(1)).dropna()
+    vol_anual     = vols.std() * np.sqrt(252) * 100
 
-        # ── Gráfico precio + SMA ──
+    # Info del activo
+    info = next((a for r in catalogo["por_region"].values() for a in r if a["ticker"] == ticker), {})
+    st.markdown(f"**{info.get('nombre',ticker)}** · {info.get('sector','N/A')} · {info.get('pais','N/A')} · {info.get('region','N/A')}")
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Precio actual",    f"${precio_actual:.2f}",   f"{cambio_pct:+.2f}%")
+    c2.metric("RSI actual",       f"{rsi_actual:.1f}",
+              "Sobrecomprado" if rsi_actual>70 else "Sobrevendido" if rsi_actual<30 else "Neutral")
+    c3.metric("Volatilidad anual", f"{vol_anual:.1f}%")
+    c4.metric("Observaciones",     f"{len(datos)} días")
+
+    if señales:
         st.divider()
-        st.subheader(f"Precio histórico — {ticker}")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=datos["fecha"], y=datos["cierre"],
-            name=ticker, line=dict(color=COLORES[ticker], width=2)))
-        if "sma_20" in datos.columns:
-            fig.add_trace(go.Scatter(x=datos["fecha"], y=datos["sma_20"],
-                name="SMA 20", line=dict(color="#3fb950", width=1, dash="dot")))
-        if "sma_50" in datos.columns:
-            fig.add_trace(go.Scatter(x=datos["fecha"], y=datos["sma_50"],
-                name="SMA 50", line=dict(color="#d29922", width=1, dash="dot")))
-        fig.update_layout(**plotly_theme(), height=350,
-                          legend=dict(orientation="h", yanchor="bottom", y=1.02))
-        st.plotly_chart(fig, use_container_width=True)
+        st.subheader("Señales activas")
+        cols = st.columns(min(len(señales), 4))
+        for i, s in enumerate(señales[:4]):
+            with cols[i]:
+                icon = "🟢" if s["tipo"]=="COMPRA" else "🔴"
+                st.info(f"{icon} **{s['tipo']}** — {s['indicador']}\n\n{s['descripcion']}")
 
-        # ── RSI + MACD ──
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.subheader("RSI (14 días)")
-            fig_rsi = go.Figure()
-            fig_rsi.add_trace(go.Scatter(x=datos["fecha"], y=datos["rsi_14"],
-                name="RSI", line=dict(color="#bc8cff", width=1.5), fill="tozeroy",
-                fillcolor="rgba(188,140,255,0.05)"))
-            fig_rsi.add_hline(y=70, line_dash="dash", line_color="rgba(248,81,73,0.5)",
-                              annotation_text="Sobrecomprado (70)")
-            fig_rsi.add_hline(y=30, line_dash="dash", line_color="rgba(63,185,80,0.5)",
-                              annotation_text="Sobrevendido (30)")
-            fig_rsi.update_layout(**plotly_theme(), height=250, yaxis=dict(range=[0,100]))
-            st.plotly_chart(fig_rsi, use_container_width=True)
+    # Gráfico precio
+    st.divider()
+    color = color_region(info.get("region","Norteamérica"))
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=datos["fecha"], y=datos["cierre"],
+        name=ticker, line=dict(color=color, width=2)))
+    if "sma_20" in datos.columns:
+        fig.add_trace(go.Scatter(x=datos["fecha"], y=datos["sma_20"],
+            name="SMA 20", line=dict(color="#3fb950", width=1, dash="dot")))
+    if "sma_50" in datos.columns:
+        fig.add_trace(go.Scatter(x=datos["fecha"], y=datos["sma_50"],
+            name="SMA 50", line=dict(color="#d29922", width=1, dash="dot")))
+    fig.update_layout(**plotly_theme(), height=340,
+                      title=f"Precio histórico — {ticker}",
+                      legend=dict(orientation="h", yanchor="bottom", y=1.02))
+    st.plotly_chart(fig, use_container_width=True)
 
-        with col_b:
-            st.subheader("MACD")
-            fig_macd = go.Figure()
-            fig_macd.add_trace(go.Scatter(x=datos["fecha"], y=datos["macd"],
-                name="MACD", line=dict(color="#58a6ff", width=1.5)))
-            fig_macd.add_trace(go.Scatter(x=datos["fecha"], y=datos["macd_señal"],
-                name="Signal", line=dict(color="#f85149", width=1)))
-            hist = datos["macd_hist"].fillna(0)
-            fig_macd.add_trace(go.Bar(x=datos["fecha"], y=hist, name="Histograma",
-                marker_color=["rgba(63,185,80,0.6)" if v>=0 else "rgba(248,81,73,0.6)" for v in hist]))
-            fig_macd.update_layout(**plotly_theme(), height=250,
-                                   legend=dict(orientation="h", yanchor="bottom", y=1.02))
-            st.plotly_chart(fig_macd, use_container_width=True)
+    col_a, col_b = st.columns(2)
+    with col_a:
+        fig_rsi = go.Figure()
+        fig_rsi.add_trace(go.Scatter(x=datos["fecha"], y=datos["rsi_14"],
+            name="RSI", line=dict(color="#bc8cff", width=1.5)))
+        fig_rsi.add_hline(y=70, line_dash="dash", line_color="rgba(248,81,73,0.5)")
+        fig_rsi.add_hline(y=30, line_dash="dash", line_color="rgba(63,185,80,0.5)")
+        fig_rsi.update_layout(**plotly_theme(), height=240,
+                              title="RSI (14 días)", yaxis=dict(range=[0,100]))
+        st.plotly_chart(fig_rsi, use_container_width=True)
 
-        # ── Bollinger ──
-        st.subheader("Bandas de Bollinger")
-        fig_boll = go.Figure()
-        fig_boll.add_trace(go.Scatter(x=datos["fecha"], y=datos["boll_superior"],
-            name="Banda superior", line=dict(color="rgba(248,81,73,0.6)", width=1)))
-        fig_boll.add_trace(go.Scatter(x=datos["fecha"], y=datos["boll_inferior"],
-            name="Banda inferior", line=dict(color="rgba(63,185,80,0.6)", width=1),
-            fill="tonexty", fillcolor="rgba(88,166,255,0.03)"))
-        fig_boll.add_trace(go.Scatter(x=datos["fecha"], y=datos["boll_media"],
-            name="SMA 20", line=dict(color="rgba(88,166,255,0.6)", width=1, dash="dot")))
-        fig_boll.add_trace(go.Scatter(x=datos["fecha"], y=datos["cierre"],
-            name=ticker, line=dict(color="#fff", width=1.5)))
-        fig_boll.update_layout(**plotly_theme(), height=300,
+    with col_b:
+        fig_macd = go.Figure()
+        fig_macd.add_trace(go.Scatter(x=datos["fecha"], y=datos["macd"],
+            name="MACD", line=dict(color="#58a6ff", width=1.5)))
+        fig_macd.add_trace(go.Scatter(x=datos["fecha"], y=datos["macd_señal"],
+            name="Signal", line=dict(color="#f85149", width=1)))
+        hist = datos["macd_hist"].fillna(0)
+        fig_macd.add_trace(go.Bar(x=datos["fecha"], y=hist, name="Histograma",
+            marker_color=["rgba(63,185,80,0.6)" if v>=0 else "rgba(248,81,73,0.6)" for v in hist]))
+        fig_macd.update_layout(**plotly_theme(), height=240, title="MACD",
                                legend=dict(orientation="h", yanchor="bottom", y=1.02))
-        st.plotly_chart(fig_boll, use_container_width=True)
+        st.plotly_chart(fig_macd, use_container_width=True)
+
+    fig_boll = go.Figure()
+    fig_boll.add_trace(go.Scatter(x=datos["fecha"], y=datos["boll_superior"],
+        name="Banda sup", line=dict(color="rgba(248,81,73,0.6)", width=1)))
+    fig_boll.add_trace(go.Scatter(x=datos["fecha"], y=datos["boll_inferior"],
+        name="Banda inf", line=dict(color="rgba(63,185,80,0.6)", width=1),
+        fill="tonexty", fillcolor="rgba(88,166,255,0.03)"))
+    fig_boll.add_trace(go.Scatter(x=datos["fecha"], y=datos["cierre"],
+        name=ticker, line=dict(color="#fff", width=1.5)))
+    fig_boll.update_layout(**plotly_theme(), height=280, title="Bandas de Bollinger",
+                           legend=dict(orientation="h", yanchor="bottom", y=1.02))
+    st.plotly_chart(fig_boll, use_container_width=True)
+
 
 # ════════════════════════════════════════
 # VaR & CVaR
 # ════════════════════════════════════════
 elif pagina == "VaR & CVaR":
     st.title("Valor en Riesgo (VaR) y CVaR")
+    st.info("Usando portafolio base: AAPL 30% · MSFT 25% · GOOGL 20% · AMZN 15% · TSLA 10%")
 
-    col1, col2 = st.columns([2,1])
-    confianza = col1.select_slider("Nivel de confianza", [0.90, 0.95, 0.99],
-                                    value=0.95, format_func=lambda x: f"{x*100:.0f}%")
-    calcular = col2.button("Calcular VaR", type="primary", use_container_width=True)
-
-    payload = {
-        "tickers":          ["AAPL","MSFT","GOOGL","AMZN","TSLA"],
-        "pesos":            [0.30, 0.25, 0.20, 0.15, 0.10],
-        "nivel_confianza":  confianza,
-    }
+    confianza = st.select_slider("Nivel de confianza", [0.90, 0.95, 0.99], value=0.95,
+                                  format_func=lambda x: f"{x*100:.0f}%")
 
     with st.spinner("Calculando VaR con 3 métodos..."):
-        var_data, err = post_api("/var", payload)
+        var_data, err = post_api("/var", {
+            "tickers": ["AAPL","MSFT","GOOGL","AMZN","TSLA"],
+            "pesos":   [0.30, 0.25, 0.20, 0.15, 0.10],
+            "nivel_confianza": confianza,
+        })
 
     if err:
         st.error(f"Error: {err}")
         st.stop()
 
-    vh = var_data["var_historico"]
-    vp = var_data["var_parametrico"]
-    vm = var_data["var_monte_carlo"]
-    st_p = var_data["estadisticas_portafolio"]
-    kp = var_data["backtesting_kupiec"]
+    vh=var_data["var_historico"]; vp=var_data["var_parametrico"]
+    vm=var_data["var_monte_carlo"]; st_p=var_data["estadisticas_portafolio"]
+    kp=var_data["backtesting_kupiec"]
 
-    # KPIs
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("VaR Histórico", vh["var_porcentaje"], f"${abs(vh['var_monetario']):,.0f} USD")
-    c2.metric("CVaR Histórico", vh["cvar_porcentaje"], f"${abs(vh['cvar_monetario']):,.0f} USD")
-    c3.metric("Sharpe Ratio", f"{st_p['sharpe_ratio']:.3f}")
-    c4.metric("Volatilidad anual", f"{st_p['volatilidad_anual']*100:.1f}%")
+    c1.metric("VaR Histórico",   vh["var_porcentaje"], f"${abs(vh['var_monetario']):,.0f}")
+    c2.metric("CVaR Histórico",  vh["cvar_porcentaje"],f"${abs(vh['cvar_monetario']):,.0f}")
+    c3.metric("Sharpe Ratio",    f"{st_p['sharpe_ratio']:.3f}")
+    c4.metric("Volatilidad",     f"{st_p['volatilidad_anual']*100:.1f}%")
 
     st.info(f"📌 {vh['interpretacion']}")
 
-    # ── Tabla comparativa ──
-    st.divider()
-    st.subheader("Comparación de métodos")
     df_var = pd.DataFrame([
-        {"Método":"Histórico",   "VaR (%)":vh["var_porcentaje"], "VaR (USD)":f"${abs(vh['var_monetario']):,.0f}", "CVaR (%)":vh["cvar_porcentaje"], "CVaR (USD)":f"${abs(vh['cvar_monetario']):,.0f}", "Supuesto":"Sin supuesto distribucional"},
-        {"Método":"Paramétrico", "VaR (%)":vp["var_porcentaje"], "VaR (USD)":f"${abs(vp['var_monetario']):,.0f}", "CVaR (%)":vp["cvar_porcentaje"], "CVaR (USD)":f"${abs(vp['cvar_monetario']):,.0f}", "Supuesto":"Distribución normal"},
-        {"Método":"Monte Carlo", "VaR (%)":vm["var_porcentaje"], "VaR (USD)":f"${abs(vm['var_monetario']):,.0f}", "CVaR (%)":vm["cvar_porcentaje"], "CVaR (USD)":f"${abs(vm['cvar_monetario']):,.0f}", "Supuesto":"Normal (10k simulaciones)"},
+        {"Método":"Histórico",   "VaR (%)":vh["var_porcentaje"],"VaR (USD)":f"${abs(vh['var_monetario']):,.0f}","CVaR (%)":vh["cvar_porcentaje"],"CVaR (USD)":f"${abs(vh['cvar_monetario']):,.0f}","Supuesto":"Sin supuesto distribucional"},
+        {"Método":"Paramétrico", "VaR (%)":vp["var_porcentaje"],"VaR (USD)":f"${abs(vp['var_monetario']):,.0f}","CVaR (%)":vp["cvar_porcentaje"],"CVaR (USD)":f"${abs(vp['cvar_monetario']):,.0f}","Supuesto":"Distribución normal"},
+        {"Método":"Monte Carlo", "VaR (%)":vm["var_porcentaje"],"VaR (USD)":f"${abs(vm['var_monetario']):,.0f}","CVaR (%)":vm["cvar_porcentaje"],"CVaR (USD)":f"${abs(vm['cvar_monetario']):,.0f}","Supuesto":"Normal (10k sim.)"},
     ])
     st.dataframe(df_var, use_container_width=True, hide_index=True)
 
-    # ── Gráficas ──
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.subheader("VaR por método")
-        fig_var = go.Figure(go.Bar(
-            x=["Histórico","Paramétrico","Monte Carlo"],
-            y=[abs(vh["var_decimal"])*100, abs(vp["var_decimal"])*100, abs(vm["var_decimal"])*100],
-            marker_color=["#f85149","#d29922","#58a6ff"],
-            text=[vh["var_porcentaje"], vp["var_porcentaje"], vm["var_porcentaje"]],
-            textposition="outside",
-        ))
-        fig_var.update_layout(**plotly_theme(), height=320,
-                              yaxis_title="VaR (%)", showlegend=False)
-        st.plotly_chart(fig_var, use_container_width=True)
+    c_a, c_b = st.columns(2)
+    labs = ["Histórico","Paramétrico","Monte Carlo"]
+    vv = [abs(vh["var_decimal"])*100, abs(vp["var_decimal"])*100, abs(vm["var_decimal"])*100]
+    cv = [abs(vh["cvar_decimal"])*100, abs(vp["cvar_decimal"])*100, abs(vm["cvar_decimal"])*100]
 
-    with col_b:
-        st.subheader("VaR vs CVaR por método")
-        metodos = ["Histórico","Paramétrico","Monte Carlo"]
-        var_vals  = [abs(vh["var_decimal"])*100, abs(vp["var_decimal"])*100, abs(vm["var_decimal"])*100]
-        cvar_vals = [abs(vh["cvar_decimal"])*100, abs(vp["cvar_decimal"])*100, abs(vm["cvar_decimal"])*100]
-        fig_cvar = go.Figure()
-        fig_cvar.add_trace(go.Bar(name="VaR",  x=metodos, y=var_vals,  marker_color="rgba(248,81,73,0.7)"))
-        fig_cvar.add_trace(go.Bar(name="CVaR", x=metodos, y=cvar_vals, marker_color="rgba(248,81,73,1.0)"))
-        fig_cvar.update_layout(**plotly_theme(), height=320,
-                               barmode="group", yaxis_title="(%)")
-        st.plotly_chart(fig_cvar, use_container_width=True)
+    with c_a:
+        fig = go.Figure(go.Bar(x=labs, y=vv, marker_color=["#f85149","#d29922","#58a6ff"],
+                               text=[f"{v:.2f}%" for v in vv], textposition="outside"))
+        fig.update_layout(**plotly_theme(), height=300, title="VaR por método", showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
 
-    # ── Backtesting Kupiec ──
+    with c_b:
+        fig2 = go.Figure()
+        fig2.add_trace(go.Bar(name="VaR",  x=labs, y=vv, marker_color="rgba(248,81,73,0.6)"))
+        fig2.add_trace(go.Bar(name="CVaR", x=labs, y=cv, marker_color="rgba(248,81,73,1.0)"))
+        fig2.update_layout(**plotly_theme(), height=300, title="VaR vs CVaR", barmode="group")
+        st.plotly_chart(fig2, use_container_width=True)
+
     st.divider()
-    st.subheader("Backtesting de Kupiec")
+    st.subheader("Backtesting Kupiec")
     c1, c2, c3 = st.columns(3)
     c1.metric("Excedencias observadas", kp["excedencias_observadas"], f"de {kp['total_observaciones']} días")
     c2.metric("Tasa real",     f"{kp['tasa_excedencias_real']*100:.2f}%")
@@ -351,121 +332,71 @@ elif pagina == "VaR & CVaR":
     else:
         st.warning(f"⚠ {kp['interpretacion']}")
 
+
 # ════════════════════════════════════════
 # MARKOWITZ & CAPM
 # ════════════════════════════════════════
 elif pagina == "Markowitz & CAPM":
     st.title("Frontera Eficiente de Markowitz & CAPM")
+    st.caption("Portafolio base: AAPL · MSFT · GOOGL · AMZN · TSLA — ~30s")
 
-    calcular = st.button("Calcular Frontera Eficiente + CAPM", type="primary")
-    st.caption("Puede tardar ~30 segundos — optimiza 500 portafolios y calcula regresión contra el S&P 500")
-
-    with st.spinner("Optimizando portafolios y calculando Beta..."):
-        frontera_data, err1 = post_api("/frontera-eficiente", {
-            "tickers": ACTIVOS, "pesos": [0.3,0.25,0.2,0.15,0.1]
-        })
+    with st.spinner("Optimizando portafolios..."):
+        frontera, err1 = post_api("/frontera-eficiente",
+            {"tickers":["AAPL","MSFT","GOOGL","AMZN","TSLA"],"pesos":[.3,.25,.2,.15,.1]})
         capm_data, err2 = get_api("/capm")
 
     if err1 or err2:
         st.error(f"Error: {err1 or err2}")
         st.stop()
 
-    # Portafolios óptimos
-    st.subheader("Portafolios óptimos")
     c1, c2, c3 = st.columns(3)
-    ports = [
-        (c1, "Mínima varianza",  frontera_data["portafolio_min_varianza"],  "#3fb950"),
-        (c2, "Máximo Sharpe",    frontera_data["portafolio_max_sharpe"],    "#58a6ff"),
-        (c3, "Igual ponderado",  frontera_data["portafolio_igual_ponderado"],"#7d8590"),
-    ]
-    for col, titulo, p, color in ports:
+    for col, titulo, p in [
+        (c1,"Mínima varianza", frontera["portafolio_min_varianza"]),
+        (c2,"Máximo Sharpe",   frontera["portafolio_max_sharpe"]),
+        (c3,"Igual ponderado", frontera["portafolio_igual_ponderado"]),
+    ]:
         with col:
             st.metric(titulo, p["retorno_pct"],
                       f"Vol: {p['volatilidad_pct']} · Sharpe: {p['sharpe_ratio']:.3f}")
-            pesos_df = pd.DataFrame(list(p["pesos"].items()), columns=["Ticker","Peso"])
-            pesos_df["Peso (%)"] = (pesos_df["Peso"] * 100).round(1).astype(str) + "%"
-            st.dataframe(pesos_df[["Ticker","Peso (%)"]], hide_index=True, use_container_width=True)
+            df_p = pd.DataFrame(list(p["pesos"].items()), columns=["Ticker","Peso"])
+            df_p["Peso (%)"] = (df_p["Peso"]*100).round(1).astype(str)+"%"
+            st.dataframe(df_p[["Ticker","Peso (%)"]], hide_index=True, use_container_width=True)
 
-    # ── Frontera eficiente ──
-    st.divider()
-    st.subheader("Frontera eficiente — nube de Markowitz")
-    sim     = frontera_data["simulacion"]
-    front   = frontera_data["frontera_eficiente"]
-    min_var = frontera_data["portafolio_min_varianza"]
-    max_sh  = frontera_data["portafolio_max_sharpe"]
+    sim=frontera["simulacion"]; front=frontera["frontera_eficiente"]
+    minV=frontera["portafolio_min_varianza"]; maxS=frontera["portafolio_max_sharpe"]
 
-    fig_front = go.Figure()
-    fig_front.add_trace(go.Scatter(
-        x=[v*100 for v in sim["volatilidades"]],
-        y=[r*100 for r in sim["retornos"]],
-        mode="markers",
-        name="Portafolios simulados",
-        marker=dict(
-            size=5,
-            color=sim["sharpes"],
-            colorscale="Blues",
-            showscale=True,
-            colorbar=dict(title="Sharpe", thickness=12),
-            opacity=0.6,
-        ),
-    ))
-    fig_front.add_trace(go.Scatter(
-        x=[p["volatilidad"]*100 for p in front],
-        y=[p["retorno"]*100 for p in front],
-        mode="lines", name="Frontera eficiente",
-        line=dict(color="#3fb950", width=2.5),
-    ))
-    fig_front.add_trace(go.Scatter(
-        x=[min_var["volatilidad_anual"]*100], y=[min_var["retorno_anual"]*100],
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=[v*100 for v in sim["volatilidades"]], y=[r*100 for r in sim["retornos"]],
+        mode="markers", name="Portafolios simulados",
+        marker=dict(size=5, color=sim["sharpes"], colorscale="Blues",
+                    showscale=True, colorbar=dict(title="Sharpe",thickness=12), opacity=0.6)))
+    fig.add_trace(go.Scatter(
+        x=[p["volatilidad"]*100 for p in front], y=[p["retorno"]*100 for p in front],
+        mode="lines", name="Frontera eficiente", line=dict(color="#3fb950", width=2.5)))
+    fig.add_trace(go.Scatter(
+        x=[minV["volatilidad_anual"]*100], y=[minV["retorno_anual"]*100],
         mode="markers", name="Mínima varianza",
-        marker=dict(size=14, color="#3fb950", symbol="star"),
-    ))
-    fig_front.add_trace(go.Scatter(
-        x=[max_sh["volatilidad_anual"]*100], y=[max_sh["retorno_anual"]*100],
+        marker=dict(size=14, color="#3fb950", symbol="star")))
+    fig.add_trace(go.Scatter(
+        x=[maxS["volatilidad_anual"]*100], y=[maxS["retorno_anual"]*100],
         mode="markers", name="Máximo Sharpe",
-        marker=dict(size=14, color="#58a6ff", symbol="triangle-up"),
-    ))
-    fig_front.update_layout(
-        **plotly_theme(), height=440,
-        xaxis_title="Volatilidad anual (%)",
-        yaxis_title="Retorno anual (%)",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02),
-    )
-    st.plotly_chart(fig_front, use_container_width=True)
+        marker=dict(size=14, color="#58a6ff", symbol="triangle-up")))
+    fig.update_layout(**plotly_theme(), height=420,
+                      xaxis_title="Volatilidad (%)", yaxis_title="Retorno (%)",
+                      legend=dict(orientation="h", yanchor="bottom", y=1.02))
+    st.plotly_chart(fig, use_container_width=True)
 
-    # ── CAPM table ──
-    st.divider()
-    st.subheader("CAPM — Beta y Alpha por activo")
-    activos_capm = capm_data.get("activos", {})
-    rows = []
-    for ticker, d in activos_capm.items():
-        rows.append({
-            "Ticker":                   ticker,
-            "Beta":                     round(d.get("beta", 0), 4),
-            "Alpha anual (%)":          round((d.get("alpha_anual", 0) or 0) * 100, 2),
-            "Rend. esperado CAPM (%)":  round((d.get("rendimiento_esperado_capm", 0) or 0) * 100, 2),
-            "Volatilidad anual (%)":    round((d.get("volatilidad_anual", 0) or 0) * 100, 1),
-            "R²":                       round(d.get("r_cuadrado", 0) or 0, 4),
-            "Interpretación Beta":      d.get("interpretacion_beta", "—"),
-        })
-    df_capm = pd.DataFrame(rows)
-    st.dataframe(df_capm, use_container_width=True, hide_index=True)
+    activos_capm = capm_data.get("activos",{})
+    rows = [{"Ticker":t, "Beta":round(d.get("beta",0),4),
+             "Alpha (%)":round((d.get("alpha_anual",0) or 0)*100,2),
+             "Rend. CAPM (%)":round((d.get("rendimiento_esperado_capm",0) or 0)*100,2),
+             "Volatilidad (%)":round((d.get("volatilidad_anual",0) or 0)*100,1),
+             "R²":round(d.get("r_cuadrado",0) or 0,4),
+             "Interpretación":d.get("interpretacion_beta","—")}
+            for t,d in activos_capm.items()]
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-    # ── Gráfico Beta ──
-    st.subheader("Beta por activo vs mercado (S&P 500)")
-    tickers_list = [r["Ticker"] for r in rows]
-    betas_list   = [r["Beta"] for r in rows]
-    fig_beta = go.Figure(go.Bar(
-        x=tickers_list, y=betas_list,
-        marker_color=[COLORES[t] for t in tickers_list],
-        text=[f"{b:.3f}" for b in betas_list],
-        textposition="outside",
-    ))
-    fig_beta.add_hline(y=1, line_dash="dash", line_color="rgba(255,255,255,0.3)",
-                       annotation_text="Beta = 1 (mercado)")
-    fig_beta.update_layout(**plotly_theme(), height=320,
-                           yaxis_title="Beta", showlegend=False)
-    st.plotly_chart(fig_beta, use_container_width=True)
 
 # ════════════════════════════════════════
 # SEÑALES
@@ -473,74 +404,256 @@ elif pagina == "Markowitz & CAPM":
 elif pagina == "Señales":
     st.title("Señales automáticas de trading")
 
-    if st.button("Actualizar señales en tiempo real", type="primary"):
+    if not catalogo:
+        st.error("Sin conexión a la API.")
+        st.stop()
+
+    col1, col2 = st.columns([2,1])
+    region_sel = col1.selectbox("Región", ["Portafolio base (5 activos)"] + catalogo["regiones"])
+    actualizar = col2.button("Actualizar señales", type="primary")
+
+    if actualizar:
         st.cache_data.clear()
 
-    with st.spinner("Analizando indicadores técnicos de todos los activos..."):
-        alertas_data, err = get_api("/alertas")
+    if region_sel == "Portafolio base (5 activos)":
+        url = "/alertas"
+    else:
+        tickers_region = [a["ticker"] for a in catalogo["por_region"].get(region_sel,[])]
+        url = "/alertas?" + "&".join(f"tickers={t}" for t in tickers_region)
+
+    with st.spinner("Analizando indicadores técnicos..."):
+        alertas_data, err = get_api(url)
 
     if err:
         st.error(f"Error: {err}")
         st.stop()
 
-    # KPIs
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total alertas",   alertas_data["total_alertas"])
-    c2.metric("Señales compra",  alertas_data["alertas_compra"],  delta="alcistas")
-    c3.metric("Señales venta",   alertas_data["alertas_venta"],   delta="bajistas")
-    c4.metric("Análisis",        alertas_data["fecha_analisis"])
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Total alertas",  alertas_data["total_alertas"])
+    c2.metric("Señales compra", alertas_data["alertas_compra"],  delta="alcistas")
+    c3.metric("Señales venta",  alertas_data["alertas_venta"],   delta="bajistas")
+    c4.metric("Análisis",       alertas_data["fecha_analisis"])
 
-    # ── Resumen por ticker ──
-    st.divider()
-    st.subheader("Señal neta por activo")
-    resumen = alertas_data.get("resumen", {})
-    cols = st.columns(len(resumen))
-    for i, (ticker, d) in enumerate(resumen.items()):
-        if d.get("error"):
-            continue
+    resumen = alertas_data.get("resumen",{})
+    cols = st.columns(min(len(resumen),5))
+    for i,(ticker,d) in enumerate(list(resumen.items())[:5]):
+        if d.get("error"): continue
         with cols[i]:
-            señal = d.get("señal_neta", "NEUTRAL")
-            color = "🟢" if señal == "COMPRA" else "🔴" if señal == "VENTA" else "⚪"
-            st.metric(
-                f"{color} {ticker}",
-                f"${d.get('precio_actual', 0):.2f}",
-                f"RSI: {d.get('rsi_actual', 0):.1f}",
-            )
-            if señal == "COMPRA":
-                st.success(f"**{señal}**")
-            elif señal == "VENTA":
-                st.error(f"**{señal}**")
-            else:
-                st.info(f"**{señal}**")
+            señal = d.get("señal_neta","NEUTRAL")
+            icon = "🟢" if señal=="COMPRA" else "🔴" if señal=="VENTA" else "⚪"
+            st.metric(f"{icon} {ticker}", f"${d.get('precio_actual',0):.2f}",
+                      f"RSI: {d.get('rsi_actual',0):.1f}")
+            if señal=="COMPRA": st.success(f"**{señal}**")
+            elif señal=="VENTA": st.error(f"**{señal}**")
+            else: st.info(f"**{señal}**")
 
-    # ── Tabla detalle ──
-    st.divider()
-    st.subheader("Detalle de alertas activas")
-    alertas = alertas_data.get("alertas", [])
+    alertas = alertas_data.get("alertas",[])
     if alertas:
-        df_alertas = pd.DataFrame(alertas)
-        df_alertas["tipo_color"] = df_alertas["tipo"].map(
-            {"COMPRA": "🟢 COMPRA", "VENTA": "🔴 VENTA"}
-        )
+        df_a = pd.DataFrame(alertas)
+        df_a["tipo"] = df_a["tipo"].map({"COMPRA":"🟢 COMPRA","VENTA":"🔴 VENTA"})
         st.dataframe(
-            df_alertas[["ticker","tipo_color","indicador","fuerza","descripcion","valor","fecha"]]
-            .rename(columns={"tipo_color":"tipo"}),
-            use_container_width=True,
-            hide_index=True,
-        )
+            df_a[["ticker","tipo","indicador","fuerza","descripcion","valor","fecha"]],
+            use_container_width=True, hide_index=True)
 
-        # Gráfico distribución
-        st.subheader("Distribución de señales por indicador")
-        conteo = df_alertas.groupby(["indicador","tipo"]).size().reset_index(name="count")
-        fig_dist = px.bar(
-            conteo, x="indicador", y="count", color="tipo",
-            color_discrete_map={"COMPRA":"#3fb950","VENTA":"#f85149"},
-            template="plotly_dark", height=320,
-        )
-        fig_dist.update_layout(**plotly_theme())
-        st.plotly_chart(fig_dist, use_container_width=True)
-    else:
-        st.info("No hay alertas activas en este momento.")
+
+# ════════════════════════════════════════
+# COMPARAR ACTIVOS
+# ════════════════════════════════════════
+elif pagina == "Comparar activos":
+    st.title("Comparar activos globales")
+    st.info("Compara activos de distintas regiones, sectores y países lado a lado.")
+
+    if not catalogo:
+        st.error("Sin conexión a la API.")
+        st.stop()
+
+    todos = [f"{a['ticker']} — {a['nombre']} ({a['region']})"
+             for r in catalogo["por_region"].values() for a in r]
+
+    col1, col2 = st.columns([3,1])
+    seleccionados = col1.multiselect(
+        "Selecciona activos (mín. 2, máx. 8)",
+        todos,
+        default=["AAPL — Apple Inc. (Norteamérica)",
+                 "SAP.DE — SAP SE (Europa)",
+                 "TM — Toyota Motor (Asia)",
+                 "EC — Ecopetrol S.A. (LatAm)"]
+    )
+    fecha_cmp = col2.selectbox("Horizonte", ["2022-01-01","2020-01-01","2023-01-01"],
+                                format_func=lambda x: {"2022-01-01":"2 años","2020-01-01":"5 años","2023-01-01":"1 año"}[x])
+
+    if len(seleccionados) < 2:
+        st.warning("Selecciona al menos 2 activos.")
+        st.stop()
+
+    tickers_cmp = [s.split(" — ")[0] for s in seleccionados]
+    url = "/comparar?" + "&".join(f"tickers={t}" for t in tickers_cmp) + f"&fecha_inicio={fecha_cmp}"
+
+    with st.spinner(f"Comparando {len(tickers_cmp)} activos..."):
+        comp_data, err = get_api(url)
+
+    if err:
+        st.error(f"Error: {err}")
+        st.stop()
+
+    comp = comp_data["comparacion"]
+
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("Mejor Sharpe",        comp_data.get("mejor_sharpe","—"))
+    c2.metric("Mejor retorno",        comp_data.get("mejor_retorno","—"))
+    c3.metric("Menor volatilidad",    comp_data.get("menor_volatilidad","—"))
+    c4.metric("Activos comparados",   comp_data["total_activos"])
+
+    vals = list(comp.values())
+    labels = [v["ticker"] for v in vals]
+    colors = [color_region(v["region"]) for v in vals]
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        fig = go.Figure(go.Bar(
+            x=labels, y=[(v["retorno_total"] or 0)*100 for v in vals],
+            marker_color=colors, text=[v["retorno_total_pct"] for v in vals],
+            textposition="outside"))
+        fig.update_layout(**plotly_theme(), height=300, title="Retorno total (%)", showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_b:
+        fig2 = go.Figure(go.Bar(
+            x=labels, y=[v["sharpe_ratio"] or 0 for v in vals],
+            marker_color=colors, text=[f"{v['sharpe_ratio']:.3f}" if v['sharpe_ratio'] else '—' for v in vals],
+            textposition="outside"))
+        fig2.update_layout(**plotly_theme(), height=300, title="Sharpe Ratio", showlegend=False)
+        st.plotly_chart(fig2, use_container_width=True)
+
+    col_c, col_d = st.columns(2)
+    with col_c:
+        fig3 = go.Figure(go.Bar(
+            x=labels, y=[(v["volatilidad_anual"] or 0)*100 for v in vals],
+            marker_color=colors))
+        fig3.update_layout(**plotly_theme(), height=260, title="Volatilidad anual (%)", showlegend=False)
+        st.plotly_chart(fig3, use_container_width=True)
+
+    with col_d:
+        fig4 = go.Figure(go.Bar(
+            x=labels, y=[abs(v["max_drawdown"] or 0)*100 for v in vals],
+            marker_color=colors))
+        fig4.update_layout(**plotly_theme(), height=260, title="Máx. Drawdown (%)", showlegend=False)
+        st.plotly_chart(fig4, use_container_width=True)
+
+    rows = sorted(vals, key=lambda x: x["ranking_sharpe"] or 99)
+    df_comp = pd.DataFrame([{
+        "Ranking":    f"#{v['ranking_sharpe']}",
+        "Ticker":     v["ticker"],
+        "Región":     v["region"],
+        "Sector":     v["sector"],
+        "País":       v["pais"],
+        "Retorno total": v["retorno_total_pct"],
+        "Retorno anual": v["retorno_anual_pct"],
+        "Volatilidad":   v["volatilidad_anual_pct"],
+        "Sharpe":        f"{v['sharpe_ratio']:.3f}" if v["sharpe_ratio"] else "—",
+        "Max DD":        v["max_drawdown_pct"],
+        "RSI":           f"{v['rsi_actual']:.1f}" if v["rsi_actual"] else "—",
+        "Tendencia":     v["tendencia_ema"],
+    } for v in rows])
+    st.dataframe(df_comp, use_container_width=True, hide_index=True)
+
+
+# ════════════════════════════════════════
+# RECOMENDACIONES
+# ════════════════════════════════════════
+elif pagina == "Recomendaciones":
+    st.title("Motor de recomendaciones")
+    st.markdown("""
+    El algoritmo evalúa cada activo con **scoring multifactor**:
+    Sharpe Ratio · Señales técnicas · Momentum 3M · Volatilidad
+    """)
+
+    col1, col2, col3 = st.columns([2, 2, 1])
+    perfil = col1.selectbox("Perfil de riesgo", ["conservador","moderado","agresivo"],
+                             index=1,
+                             format_func=lambda x: {"conservador":"🛡️ Conservador","moderado":"⚖️ Moderado","agresivo":"🚀 Agresivo"}[x])
+    region_rec = col2.selectbox("Universo",
+                                 ["Global (recomendado)"] + (catalogo["regiones"] if catalogo else []))
+    calcular = col3.button("Recomendar", type="primary", use_container_width=True)
+
+    url = f"/recomendar?perfil_riesgo={perfil}"
+    if region_rec != "Global (recomendado)":
+        url += f"&region={region_rec}"
+
+    with st.spinner("Analizando mercado y calculando scores..."):
+        rec_data, err = get_api(url)
+
+    if err:
+        st.error(f"Error: {err}")
+        st.stop()
+
+    port = rec_data["portafolio_recomendado"]
+    just = rec_data["justificacion"]
+    met  = rec_data["metricas_portafolio"]
+    div  = rec_data["diversificacion"]
+
+    st.success(f"✓ Recomendación generada para perfil **{perfil}** · Retorno esperado: **{met['retorno_esperado_pct']}**")
+
+    # Tabla portafolio recomendado
+    rows_p = sorted(port.items(), key=lambda x: -x[1]["peso"])
+    df_port = pd.DataFrame([{
+        "Ticker":     t,
+        "Empresa":    d["nombre"],
+        "Región":     d["region"],
+        "Sector":     d["sector"],
+        "País":       d["pais"],
+        "Peso (%)":   d["peso_pct"],
+        "Score":      f"{d['score']:.3f}",
+        "Sharpe":     f"{d['sharpe']:.3f}",
+        "Retorno":    d["retorno_anual"],
+        "Volatilidad":d["volatilidad"],
+        "Momentum 3M":d["momentum_3m"],
+    } for t,d in rows_p])
+    st.dataframe(df_port, use_container_width=True, hide_index=True)
+
+    # Gráficos diversificación
+    col_a, col_b = st.columns(2)
+    with col_a:
+        df_reg = pd.DataFrame(list(div["por_region"].items()), columns=["Región","Peso"])
+        df_reg["Peso (%)"] = df_reg["Peso"]*100
+        fig_reg = px.pie(df_reg, names="Región", values="Peso (%)",
+                         color="Región", color_discrete_map=COLORES_REGION,
+                         template="plotly_dark", hole=0.4, title="Diversificación por región")
+        fig_reg.update_layout(**plotly_theme(), height=300)
+        st.plotly_chart(fig_reg, use_container_width=True)
+
+    with col_b:
+        df_sec = pd.DataFrame(list(div["por_sector"].items()), columns=["Sector","Peso"])
+        df_sec["Peso (%)"] = df_sec["Peso"]*100
+        fig_sec = px.bar(df_sec, x="Sector", y="Peso (%)",
+                         template="plotly_dark", title="Diversificación por sector")
+        fig_sec.update_layout(**plotly_theme(), height=300)
+        st.plotly_chart(fig_sec, use_container_width=True)
+
+    # Justificación
+    st.divider()
+    st.subheader("Justificación")
+    st.write(just["resumen"])
+
+    col_e, col_f = st.columns(2)
+    with col_e:
+        st.markdown(f"**Activo destacado:** `{just['activo_destacado']['ticker']}`")
+        st.caption(just["activo_destacado"]["razon"])
+        st.markdown(f"**Diversificación:** {just['diversificacion']}")
+
+    with col_f:
+        for alerta in just.get("alertas_riesgo",[]):
+            st.warning(f"⚠ {alerta}")
+        st.info(f"💡 {just['recomendacion_accion']}")
+
+    # Metodología
+    st.divider()
+    st.subheader("Metodología — pesos del scoring")
+    factores = rec_data.get("metodologia",{}).get("factores",{})
+    cols = st.columns(len(factores))
+    for i,(k,v) in enumerate(factores.items()):
+        cols[i].metric(k, v)
+
 
 # ════════════════════════════════════════
 # MACROECONÓMICO
@@ -548,64 +661,50 @@ elif pagina == "Señales":
 elif pagina == "Macroeconómico":
     st.title("Indicadores Macroeconómicos — FRED")
 
-    with st.spinner("Consultando FRED API..."):
-        macro_data, err = get_api("/macro")
-
+    macro_data, err = get_api("/macro")
     if err:
         st.error(f"Error: {err}")
         st.stop()
 
-    datos = macro_data.get("datos", {})
-
-    # Cards macro
-    series_config = {
-        "DGS3MO":   {"emoji":"🏦", "label":"T-Bills 3M (Rf)"},
-        "DGS10":    {"emoji":"📊", "label":"Tesoro 10 años"},
-        "CPIAUCSL": {"emoji":"📈", "label":"Inflación CPI"},
-        "UNRATE":   {"emoji":"👥", "label":"Desempleo"},
-        "FEDFUNDS": {"emoji":"⚙️", "label":"Tasa Fed"},
-        "VIXCLS":   {"emoji":"⚡", "label":"VIX"},
+    datos = macro_data.get("datos",{})
+    config = {
+        "DGS3MO":   ("🏦","T-Bills 3M (Rf)"),
+        "DGS10":    ("📊","Tesoro 10 años"),
+        "CPIAUCSL": ("📈","Inflación CPI"),
+        "UNRATE":   ("👥","Desempleo"),
+        "FEDFUNDS": ("⚙️","Tasa Fed"),
+        "VIXCLS":   ("⚡","VIX"),
     }
 
-    keys = [k for k in series_config if k in datos and not k.startswith("_")]
+    keys = [k for k in config if k in datos and not k.startswith("_")]
     cols = st.columns(len(keys))
-    for i, key in enumerate(keys):
-        d   = datos[key]
-        cfg = series_config[key]
+    for i,k in enumerate(keys):
+        d,cfg = datos[k], config[k]
         val = d.get("valor")
-        delta_text = d.get("fecha", "")
-        with cols[i]:
-            st.metric(
-                f"{cfg['emoji']} {cfg['label']}",
-                f"{val:.2f}%" if val is not None and key != "VIXCLS" else (f"{val:.1f} pts" if val else "—"),
-                delta_text,
-            )
+        unit = "pts" if k=="VIXCLS" else "%"
+        cols[i].metric(f"{cfg[0]} {cfg[1]}",
+                       f"{val:.2f}{unit}" if val is not None else "—",
+                       d.get("fecha",""))
 
     if macro_data.get("nota"):
         st.info(f"ℹ️ {macro_data['nota']}")
-        st.markdown(f"[Obtener clave FRED gratis →](https://fred.stlouisfed.org/docs/api/api_key.html)")
+        st.markdown("[Obtener clave FRED gratis →](https://fred.stlouisfed.org/docs/api/api_key.html)")
 
     ctx = macro_data.get("contexto_macro")
     if ctx:
         st.divider()
-        st.subheader("Contexto macroeconómico")
+        st.subheader("Contexto")
         st.write(ctx.get("descripcion",""))
-        st.subheader("Impacto en el portafolio")
         for item in ctx.get("impacto_portafolio",[]):
             st.markdown(f"→ {item}")
 
-    # Gráfico barras macro
-    if keys:
-        st.divider()
-        st.subheader("Comparación de tasas")
         tasas_keys = [k for k in ["DGS3MO","DGS10","FEDFUNDS","CPIAUCSL","UNRATE"] if k in datos]
-        fig_macro = go.Figure(go.Bar(
-            x=[series_config[k]["label"] for k in tasas_keys],
-            y=[datos[k].get("valor", 0) for k in tasas_keys],
-            marker_color=["#58a6ff","#3fb950","#d29922","#f85149","#bc8cff"],
-            text=[f"{datos[k].get('valor',0):.2f}%" for k in tasas_keys],
-            textposition="outside",
-        ))
-        fig_macro.update_layout(**plotly_theme(), height=340,
-                                yaxis_title="%", showlegend=False)
-        st.plotly_chart(fig_macro, use_container_width=True)
+        if tasas_keys:
+            fig = go.Figure(go.Bar(
+                x=[config[k][1] for k in tasas_keys],
+                y=[datos[k].get("valor",0) for k in tasas_keys],
+                marker_color=["#58a6ff","#3fb950","#d29922","#f85149","#bc8cff"],
+                text=[f"{datos[k].get('valor',0):.2f}%" for k in tasas_keys],
+                textposition="outside"))
+            fig.update_layout(**plotly_theme(), height=320, title="Comparación de tasas", showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
