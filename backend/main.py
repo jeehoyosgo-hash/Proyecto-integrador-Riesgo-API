@@ -40,7 +40,7 @@ app.add_middleware(
 )
 
 ACTIVOS = list(ACTIVOS_INFO.keys())
-FRED_API_KEY = os.getenv("FRED_API_KEY")
+FRED_API_KEY = os.getenv("70359b460deb9f03999a8ceb08934178")
 
 
 # ── ENDPOINT 1: HEALTH CHECK ──────────────────────────────────────────────────

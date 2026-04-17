@@ -3,7 +3,7 @@
 **Proyecto Integrador — Teoría del Riesgo**  
 **Curso:** Python para Desarrollo de APIs e Inteligencia Artificial  
 **Universidad:** Santo Tomás (USTA)  
-**Estudiante:** Mildred  
+**Estudiante:** Mildreth Diaz Polo & Jeison Hoyos
 
 ---
 
