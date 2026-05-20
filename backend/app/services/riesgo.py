@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from typing import Optional, List
-from services.datos import descargar_precios, descargar_multiples_precios
+from app.services.datos import descargar_precios, descargar_multiples_precios
 
 
 def _limpiar(v):

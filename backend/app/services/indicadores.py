@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from typing import Optional
-from services.datos import descargar_precios
+from app.services.datos import descargar_precios
 
 
 def limpiar_valor(v):

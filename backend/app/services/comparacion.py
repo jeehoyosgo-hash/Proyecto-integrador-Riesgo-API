@@ -2,11 +2,11 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from typing import Optional, List
-from services.datos import (
+from app.services.datos import (
     descargar_precios, descargar_multiples_precios,
     CATALOGO, get_por_region, get_por_sector
 )
-from services.indicadores import calcular_rsi, calcular_ema, calcular_macd
+from app.services.indicadores import calcular_rsi, calcular_ema, calcular_macd
 
 
 def _limpiar(v):
