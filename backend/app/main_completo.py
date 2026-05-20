@@ -30,19 +30,19 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 load_dotenv()
 
 # ── Importar servicios existentes ──────────────────────────────────────────────
-from services.datos import (
+from app.services.datos import (
     descargar_precios, obtener_info_activo, descargar_multiples_precios,
     CATALOGO, ACTIVOS_INFO, get_regiones, get_sectores, get_paises,
     get_por_region, get_por_sector, BENCHMARKS,
 )
-from services.indicadores import calcular_todos_indicadores
-from services.riesgo import calcular_rendimientos, calcular_var_cvar
-from services.portafolio import calcular_capm, calcular_frontera_eficiente
-from services.macro import generar_alertas_portafolio, obtener_datos_fred
-from services.comparacion import comparar_activos, recomendar_portafolio
+from app.services.indicadores import calcular_todos_indicadores
+from app.services.riesgo import calcular_rendimientos, calcular_var_cvar
+from app.services.portafolio import calcular_capm, calcular_frontera_eficiente
+from app.services.macro import generar_alertas_portafolio, obtener_datos_fred
+from app.services.comparacion import comparar_activos, recomendar_portafolio
 
 # ── Importar servicios nuevos ──────────────────────────────────────────────────
-from services.riesgo_completo import (
+from app.services.riesgo_completo import (
     calcular_var_completo, kupiec_pof,
     black_scholes, volatilidad_implicita,
     ajustar_nelson_siegel, calcular_bono,
@@ -57,7 +57,7 @@ except Exception:
     ML_DISPONIBLE = False
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-
+from app.config import get_settings
 
 FRED_API_KEY  = os.getenv("FRED_API_KEY", "")
 ACTIVOS_BASE  = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
@@ -734,4 +734,4 @@ def recomendar(
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main_completo:app", host="0.0.0.0", port=8000, reload=True)

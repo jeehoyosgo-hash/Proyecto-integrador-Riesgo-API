@@ -1,17 +1,52 @@
-# Entorno virtual
+# ── Python ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Entorno virtual ────────────────────────────────────
 venv/
 .venv/
+env/
+.env/
 
-# Variables de entorno (claves secretas - NUNCA subir a GitHub)
+# ── Variables de entorno (NUNCA subir al repo) ─────────
 .env
+!.env.example
 
-# Python caché
-__pycache__/
-*.pyc
-*.pyo
+# ── Base de datos ──────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
 
-# VS Code
+# ── Modelo ML (generado por train.py) ─────────────────
+*.joblib
+*.pkl
+*.pickle
+*.h5
+
+# ── IDE ────────────────────────────────────────────────
 .vscode/
+.idea/
+*.swp
+*.swo
 
-# Archivos temporales
-*.log
+# ── OS ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Datos temporales ───────────────────────────────────
+data/
+*.csv
+*.parquet
+
+# ── pytest ─────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/

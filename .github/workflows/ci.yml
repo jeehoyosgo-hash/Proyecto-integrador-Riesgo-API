@@ -1,0 +1,47 @@
+name: CI — Proyecto Integrador Riesgo
+
+on:
+  push:
+    branches: [main, develop, "feature/*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests pytest + linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.9"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Instalar dependencias
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Crear .env de prueba
+        run: |
+          echo "FRED_API_KEY=" > backend/.env
+          echo "DATABASE_URL=sqlite:///./test.db" >> backend/.env
+
+      - name: Ejecutar tests
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: |
+          pytest tests/ -v --tb=short --no-header -q
+
+      - name: Verificar que la app importa sin errores
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: |
+          python -c "from app.main import app; print('✅ app.main importa correctamente')"

@@ -1,211 +1,191 @@
-# API de Análisis de Riesgo Financiero v2
+# Proyecto Integrador — Teoría del Riesgo + Python para APIs e IA
 
-**Proyecto Integrador — Teoría del Riesgo**  
-**Curso:** Python para Desarrollo de APIs e Inteligencia Artificial  
-**Universidad:** Santo Tomás (USTA)
+**Universidad Santo Tomás | Semestre 2026-I**  
+**Profesor:** Javier Mauricio Sierra  
+**Autores:** _(nombre del equipo)_
 
 ---
 
 ## Descripción
 
-API REST construida con **FastAPI + Pydantic v2** que actúa como motor de cálculo para el análisis de riesgo de un portafolio global de 30 activos financieros distribuidos en 4 regiones y 6 sectores. El sistema descarga datos en tiempo real desde Yahoo Finance y FRED, calcula indicadores técnicos, modelos de riesgo, genera señales automatizadas de trading y recomienda portafolios óptimos según el perfil de riesgo del inversionista.
+Sistema integral de análisis de riesgo financiero organizado en **5 capas**:
+
+| Capa | Contenido |
+|------|-----------|
+| 1 – Datos | APIs externas (yfinance, FRED) + SQLite via SQLAlchemy |
+| 2 – Riesgo clásico | Indicadores, rendimientos, EWMA/GARCH, CAPM, VaR+Kupiec, Markowitz QP |
+| 3 – Renta fija y derivados | Nelson-Siegel, duración, convexidad, Black-Scholes, stress testing |
+| 4 – Machine Learning | Pipeline RandomForest → joblib → Singleton → /predict |
+| 5 – Infraestructura | pytest + Docker multi-stage + Render + GitHub Actions CI |
+
+**Stack:** Python 3.11.9 · FastAPI · Pydantic v2 · SQLAlchemy · scikit-learn · Docker · Render
+
+---
+
+## Activos del portafolio
+
+| Ticker | Nombre | Sector | País |
+|--------|--------|--------|------|
+| AAPL | Apple Inc. | Tecnología | EE.UU. |
+| MSFT | Microsoft Corp. | Tecnología | EE.UU. |
+| JPM | JPMorgan Chase | Financiero | EE.UU. |
+| EC | Ecopetrol S.A. | Energía | Colombia |
+| NOVN.SW | Novartis AG | Salud | Suiza |
+
+**Justificación:** diversificación por sector (Tec/Fin/Energía/Salud) y geografía (EE.UU./LatAm/Europa). EC provee exposición al mercado colombiano relevante para el contexto académico.
+
+---
+
+## Instalación local
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/mildretha/Proyecto-integrador-Riesgo-APIs
+cd Proyecto-integrador-Riesgo-APIs
+
+# 2. Crear entorno virtual
+python -m venv venv
+source venv/bin/activate        # Linux/Mac
+# venv\Scripts\activate.bat     # Windows
+
+# 3. Instalar dependencias
+pip install -r backend/requirements.txt
+
+# 4. Configurar variables de entorno
+cp backend/.env.example backend/.env
+# Editar backend/.env con tus API keys
+```
+
+---
+
+## Variables de entorno
+
+Archivo: `backend/.env` (no subir al repositorio — ya está en `.gitignore`)
+
+| Variable | Descripción | Cómo obtenerla |
+|----------|-------------|----------------|
+| `FRED_API_KEY` | API de FRED (curva de tesoros, Rf) | [fred.stlouisfed.org/docs/api/](https://fred.stlouisfed.org/docs/api/) |
+| `ALPHAVANTAGE_API_KEY` | Precios adicionales | [alphavantage.co](https://www.alphavantage.co/support/#api-key) |
+| `DATABASE_URL` | Ruta de SQLite | `sqlite:///./riesgo.db` (por defecto) |
+
+Ver `backend/.env.example` para la plantilla completa.
+
+---
+
+## Ejecución del backend
+
+```bash
+# Opción A: local con uvicorn
+cd backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Opción B: Docker Compose (recomendado)
+docker compose up --build
+
+# Documentación automática:
+#   http://localhost:8000/docs    (Swagger UI)
+#   http://localhost:8000/redoc  (ReDoc)
+```
+
+---
+
+## Ejecución del frontend
+
+```bash
+cd frontend
+streamlit run app.py
+# Acceder en: http://localhost:8501
+```
+
+---
+
+## Entrenamiento del modelo ML
+
+```bash
+cd backend
+python -m app.ml.train --ticker AAPL --periodo 3y
+# El modelo queda en: backend/app/ml/model.joblib
+```
+
+**Propósito analítico:** Clasificación de régimen de mercado (alcista/lateral/bajista) usando 7 features derivadas de los módulos de riesgo (RSI, MACD, EWMA, rendimientos, %B Bollinger, Estocástico).
+
+---
+
+## Ejecución de tests
+
+```bash
+cd backend
+pytest tests/ -v --tb=short
+```
+
+Tests incluidos:
+1. RSI sobre serie sintética conocida
+2. VaR paramétrico vs. valor analítico teórico
+3. Paridad put-call de Black-Scholes
+4. Kupiec LR_POF: modelo perfecto no rechaza H0
+5. Kupiec LR_POF: modelo malo rechaza H0
+6. Nelson-Siegel: RMSE < 0.5pp
+7. Duración de Macaulay de bono a la par
+8. GET /precios/AAPL retorna 200 con schema correcto
+9. POST /var con pesos ≠ 1 retorna HTTP 422
+
+---
+
+## Deploy en Render
+
+**URL backend:** `https://proyecto-riesgo.onrender.com` _(actualizar con URL real)_  
+**Swagger UI:** `https://proyecto-riesgo.onrender.com/docs`  
+**ReDoc:** `https://proyecto-riesgo.onrender.com/redoc`
+
+> ⚠️ Render free-tier duerme el servicio tras 15 min sin tráfico. Cold start ~30s.  
+> Hacer una llamada de calentamiento antes de la sustentación: `curl https://proyecto-riesgo.onrender.com/`
+
+---
+
+## Uso de herramientas de IA
+
+Durante el desarrollo se usó Claude (Anthropic) como asistente para:
+- Revisar la implementación del estadístico de Kupiec (LR_POF formal)
+- Verificar las fórmulas de Nelson-Siegel y las Greeks de Black-Scholes
+- Estructurar el patrón Singleton del modelo ML
+- Generar los tests unitarios de referencia
+
+Todo el código fue revisado, entendido y adaptado por el equipo. Las decisiones metodológicas (selección de activos, modelo GARCH elegido, propósito del ML) son originales del equipo.
 
 ---
 
 ## Estructura del proyecto
 
 ```
-Proyecto-integrador-Riesgo-APIs/
-│
+proyecto-riesgo/
 ├── backend/
-│   ├── main.py                  # Servidor FastAPI — 14 endpoints
-│   ├── models.py                # Modelos Pydantic
-│   ├── requirements.txt
-│   └── services/
-│       ├── datos.py             # Yahoo Finance — 30 activos globales
-│       ├── indicadores.py       # SMA, EMA, RSI, MACD, Bollinger, Estocástico
-│       ├── riesgo.py            # Rendimientos, VaR, CVaR, Kupiec
-│       ├── portafolio.py        # CAPM, Beta, Frontera de Markowitz
-│       ├── macro.py             # Señales de trading + FRED API
-│       └── comparacion.py      # Comparación global + Motor de recomendaciones
-│
+│   ├── app/
+│   │   ├── main.py              # FastAPI app, todos los endpoints
+│   │   ├── config.py            # BaseSettings, .env
+│   │   ├── dependencies.py      # Depends(): servicios, predictor
+│   │   ├── models.py            # Pydantic schemas (request/response)
+│   │   ├── services/
+│   │   │   ├── datos.py         # Descarga yfinance, catálogo
+│   │   │   ├── indicadores.py   # SMA, EMA, RSI, MACD, Bollinger, Estocástico
+│   │   │   ├── riesgo.py        # VaR/CVaR básico
+│   │   │   ├── riesgo_completo.py # Kupiec formal, BS, NS, stress
+│   │   │   ├── portafolio.py    # CAPM, Markowitz QP
+│   │   │   ├── macro.py         # FRED API, alertas
+│   │   │   └── comparacion.py   # Comparación multi-activo
+│   │   └── ml/
+│   │       ├── train.py         # Entrenamiento offline
+│   │       ├── predictor.py     # Singleton
+│   │       └── model.joblib     # Modelo serializado (generado por train.py)
+│   ├── tests/
+│   │   └── test_proyecto.py     # Suite de tests (9 tests)
+│   ├── Dockerfile               # Multi-stage slim-bookworm
+│   ├── requirements.txt         # Versiones fijas
+│   └── .env.example
 ├── frontend/
-│   ├── index.html               # Tablero HTML — 8 secciones interactivas
-│   └── streamlit_app.py         # Tablero Streamlit
-│
-├── .env                         # Claves de API (no se sube a GitHub)
-├── .env.example
+│   └── app.py                   # Streamlit
+├── .github/
+│   └── workflows/ci.yml         # GitHub Actions
+├── docker-compose.yml
 ├── .gitignore
 └── README.md
 ```
-
----
-
-## Portafolio global — 30 activos, 4 regiones, 6 sectores
-
-| Región | Tickers | Sectores |
-|---|---|---|
-| 🇺🇸 Norteamérica | AAPL, MSFT, GOOGL, JPM, BAC, GS, XOM, CVX, JNJ, PFE, AMZN, WMT, TSLA, F | Tecnología, Financiero, Energía, Salud, Consumo, Automotriz |
-| 🇪🇺 Europa | SAP.DE, ASML.AS, HSBA.L, BNP.PA, TTE.PA, BP.L, NOVN.SW, AZN.L | Tecnología, Financiero, Energía, Salud |
-| 🌎 LatAm | EC, CIB, PETR4.SA, ITUB4.SA | Energía, Financiero |
-| 🌏 Asia | TM, SONY, SSNLF, INFY, SFTBY | Automotriz, Tecnología |
-
----
-
-## Instalación y ejecución
-
-```bash
-git clone https://github.com/mildretha/Proyecto-integrador-Riesgo-APIs.git
-cd Proyecto-integrador-Riesgo-APIs
-
-python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # macOS/Linux
-
-pip install -r backend/requirements.txt
-
-# Configurar clave FRED (opcional — sin clave usa datos de ejemplo)
-# Obtener en: https://fred.stlouisfed.org/docs/api/api_key.html
-cp .env.example .env
-# Editar .env y agregar FRED_API_KEY=tu_clave
-
-cd backend
-python main.py
-```
-
-Swagger UI: `http://localhost:8000/docs`
-
----
-
-## Endpoints — v2
-
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/` | Health check |
-| GET | `/activos` | Catálogo con filtros por región/sector/país |
-| GET | `/catalogo` | Catálogo completo organizado por región y sector |
-| GET | `/activos/{ticker}/precio` | Precio actual en tiempo real |
-| GET | `/precios/{ticker}` | Precios históricos (Yahoo Finance) |
-| GET | `/rendimientos/{ticker}` | Rendimientos + pruebas de normalidad |
-| GET | `/indicadores/{ticker}` | SMA, EMA, RSI, MACD, Bollinger, Estocástico |
-| POST | `/var` | VaR y CVaR — 3 métodos + backtesting Kupiec |
-| GET | `/capm` | Beta, Alpha y rendimiento esperado CAPM |
-| POST | `/frontera-eficiente` | Frontera eficiente de Markowitz |
-| GET | `/alertas` | Señales automáticas de trading |
-| GET | `/macro` | Indicadores macroeconómicos FRED |
-| GET | `/comparar` | Comparación de activos entre regiones/sectores |
-| GET | `/recomendar` | Motor de recomendaciones con scoring multifactor |
-
----
-
-## Motor de recomendaciones
-
-El endpoint `/recomendar` evalúa cada activo con scoring multifactor y sugiere un portafolio óptimo según el perfil de riesgo.
-
-**Perfiles disponibles:**
-
-| Perfil | Sharpe | Técnico | Momentum | Volatilidad |
-|---|---|---|---|---|
-| 🛡️ Conservador | 30% | 20% | 10% | 40% |
-| ⚖️ Moderado | 40% | 25% | 20% | 15% |
-| 🚀 Agresivo | 35% | 25% | 35% | 5% |
-
-El portafolio recomendado se propaga automáticamente a VaR y Markowitz en el tablero.
-
----
-
-## Tablero HTML
-
-Abre `frontend/index.html` directamente en el navegador con el servidor corriendo.
-
-**8 secciones:**
-- Dashboard — catálogo global con filtros
-- Precios e Indicadores — gráficas de precio, RSI, MACD, Bollinger
-- VaR & CVaR — 3 métodos + Kupiec (usa el portafolio activo)
-- Markowitz & CAPM — frontera eficiente + Beta (usa el portafolio activo)
-- Señales — alertas de trading por región
-- Comparar — comparación de activos entre regiones
-- Recomendaciones — motor de scoring · genera portafolio activo
-- Macroeconómico — indicadores FRED
-
----
-
-## Tablero Streamlit
-
-```bash
-pip install streamlit plotly
-cd frontend
-streamlit run streamlit_app.py
-```
-
-Abre en `http://localhost:8501`
-
----
-
-## Flujo recomendado
-
-```
-1. Recomendaciones (elige perfil)
-       ↓ portafolio activo se guarda globalmente
-2. VaR & CVaR (usa el portafolio recomendado)
-       ↓
-3. Markowitz & CAPM (usa el portafolio recomendado)
-       ↓
-4. Señales (alertas de los activos del portafolio)
-```
-
----
-
-## Ejemplo de uso — comparación global
-
-```
-GET /comparar?tickers=AAPL&tickers=SAP.DE&tickers=TM&tickers=EC
-```
-
-Retorna métricas comparativas (Sharpe, VaR, momentum, RSI, drawdown) y ranking por Sharpe Ratio.
-
----
-
-## Preguntas de reflexión
-
-**1. ¿Por qué se usa `ddof=1`?**
-Los rendimientos representan una muestra, no la población completa. El estimador muestral divide entre (n-1) para corregir el sesgo hacia abajo.
-
-**2. ¿Ventaja de separar `services/`?**
-Cada módulo es testeable independientemente. Si el transporte cambia (REST → gRPC), la lógica de cálculo no cambia.
-
-**3. ¿Qué pasa cuando FastAPI retorna 422?**
-Pydantic intercepta antes de que llegue al endpoint. Detecta la violación y genera un `ValidationError` que FastAPI convierte en HTTP 422 con detalle del campo que falló.
-
-**4. ¿Por qué rendimientos logarítmicos?**
-Son aditivos en el tiempo y tienen distribución más simétrica que los simples. Facilitan las pruebas estadísticas y evitan rendimientos menores a -100%.
-
-**5. ¿Qué mide el Sharpe Ratio?**
-Retorno en exceso sobre la tasa libre de riesgo por unidad de riesgo: `(E(R) - Rf) / σ`. El portafolio de máximo Sharpe es el óptimo en la teoría de Markowitz.
-
----
-
-## Stack tecnológico
-
-| Componente | Tecnología |
-|---|---|
-| Framework API | FastAPI 0.111 |
-| Validación | Pydantic v2 |
-| Servidor | Uvicorn |
-| Datos mercado | yfinance |
-| Análisis | NumPy, Pandas, SciPy |
-| Optimización | SciPy minimize (SLSQP) |
-| Tablero web | HTML + Chart.js |
-| Tablero análisis | Streamlit + Plotly |
-| Variables entorno | python-dotenv |
-
----
-
-## Referencias
-
-- FastAPI: https://fastapi.tiangolo.com/
-- Pydantic: https://docs.pydantic.dev/
-- yfinance: https://github.com/ranaroussi/yfinance
-- FRED API: https://fred.stlouisfed.org/docs/api/
-- Markowitz, H. (1952). *Portfolio Selection*. Journal of Finance.
-- Hull, J. (2018). *Options, Futures, and Other Derivatives*.

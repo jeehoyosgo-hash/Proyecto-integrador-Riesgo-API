@@ -1,0 +1,971 @@
+"""
+app.py — Dashboard Shiny v2 CORREGIDO
+======================================
+Correcciones respecto a v1:
+  1. Selector de activos carga dinámicamente desde GET /activos (no hardcodeado)
+  2. VaR: fix matmul — el backend maneja el cálculo, el frontend solo muestra
+  3. Black-Scholes: gráfico de payoff removido (era el que intentaba importar app.services)
+  4. ML: tabla de features ahora muestra los valores correctamente
+  5. Comparación: botón ahora dispara correctamente el reactive
+  6. Portafolio default usa los 8 activos recomendados
+
+Ejecución:
+  cd frontend
+  shiny run app.py --reload --port 8501
+"""
+
+from shiny import App, ui, render, reactive
+import requests
+import pandas as pd
+from datetime import date
+
+API = "http://localhost:8000"
+
+TICKERS_DEFAULT   = ["AAPL", "JPM", "XOM", "JNJ", "EC", "CIB", "SAP.DE", "NOVN.SW"]
+PESOS_DEFAULT     = "0.15,0.15,0.12,0.12,0.12,0.10,0.12,0.12"
+TICKERS_STR       = ",".join(TICKERS_DEFAULT)
+
+
+def api_get(path, params=None):
+    try:
+        r = requests.get(f"{API}{path}", params=params, timeout=45)
+        r.raise_for_status()
+        return r.json(), None
+    except requests.exceptions.ConnectionError:
+        return None, f"Sin conexión al backend ({API})"
+    except Exception as e:
+        try:
+            detail = r.json().get("detail", str(e))
+        except Exception:
+            detail = str(e)
+        return None, detail
+
+
+def api_post(path, payload):
+    try:
+        r = requests.post(f"{API}{path}", json=payload, timeout=90)
+        r.raise_for_status()
+        return r.json(), None
+    except requests.exceptions.ConnectionError:
+        return None, f"Sin conexión al backend ({API})"
+    except Exception as e:
+        try:
+            detail = r.json().get("detail", str(e))
+        except Exception:
+            detail = str(e)
+        return None, detail
+
+
+def fmt_pct(v):
+    if v is None: return "—"
+    try: return f"{float(v)*100:.2f}%"
+    except: return str(v)
+
+def fmt_usd(v):
+    if v is None: return "—"
+    try: return f"${float(v):,.2f}"
+    except: return str(v)
+
+def color_num(v, positive_good=True):
+    if v is None: return "—"
+    try:
+        f = float(v)
+        color = "#34d399" if (f > 0) == positive_good else "#f87171"
+        return f'<span style="color:{color};font-weight:600">{f:.4f}</span>'
+    except:
+        return str(v)
+
+
+# ─────────────────────────────────────────────────────────
+# UI
+# ─────────────────────────────────────────────────────────
+
+app_ui = ui.page_fluid(
+    ui.tags.head(ui.tags.style("""
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+        body{font-family:'IBM Plex Sans',sans-serif;background:#0f1117;color:#e2e8f0;margin:0}
+        .card{background:#1a1f2e;border:1px solid #2d3748;border-radius:12px;padding:20px;margin-bottom:16px}
+        .card-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:10px}
+        .metric-big{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700;color:#60a5fa}
+        .metric-pos{color:#34d399!important} .metric-neg{color:#f87171!important} .metric-neu{color:#60a5fa!important}
+        .header-bar{background:linear-gradient(135deg,#1e40af,#7c3aed 50%,#db2777);padding:18px 28px;border-radius:12px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+        .header-title{font-size:22px;font-weight:700;color:white;margin:0}
+        .header-sub{font-size:13px;color:rgba(255,255,255,.75);margin:4px 0 0}
+        .status-ok{background:#064e3b;color:#34d399;padding:4px 14px;border-radius:8px;font-size:12px;font-weight:600}
+        .status-err{background:#450a0a;color:#f87171;padding:4px 14px;border-radius:8px;font-size:12px;font-weight:600}
+        .badge-buy{display:inline-block;background:#064e3b;color:#34d399;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;margin:2px}
+        .badge-sell{display:inline-block;background:#450a0a;color:#f87171;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;margin:2px}
+        .badge-neu{display:inline-block;background:#1e293b;color:#94a3b8;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;margin:2px}
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th{background:#1e293b;color:#94a3b8;text-align:left;padding:9px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+        td{padding:9px 12px;border-bottom:1px solid #1e293b;font-family:'IBM Plex Mono',monospace}
+        tr:hover td{background:#1e293b55}
+        hr{border:none;border-top:1px solid #2d3748;margin:16px 0}
+        .shiny-input-container label{color:#94a3b8!important;font-size:12px!important;font-weight:500!important;text-transform:uppercase!important;letter-spacing:.04em!important}
+        .form-control,.selectize-input{background:#1a1f2e!important;border:1px solid #2d3748!important;color:#e2e8f0!important;border-radius:8px!important}
+        .btn-primary{background:linear-gradient(135deg,#1e40af,#7c3aed)!important;border:none!important;border-radius:8px!important;font-weight:600!important;width:100%!important;padding:10px!important}
+        .err{color:#f87171;font-size:13px;padding:8px;background:#450a0a22;border-radius:6px;border-left:3px solid #f87171}
+    """)),
+
+    # Header
+    ui.div(
+        ui.div(
+            ui.tags.h1("Risk Analytics", class_="header-title"),
+            ui.tags.p("Proyecto Integrador — Teoría del Riesgo · USTA 2026-I", class_="header-sub"),
+        ),
+        ui.output_ui("status_badge"),
+        class_="header-bar",
+    ),
+
+    ui.navset_tab(
+
+        # ═══ TAB 1: INDICADORES ═════════════════════════
+        ui.nav_panel("📊 Indicadores",
+            ui.row(
+                ui.column(3,
+                    ui.div(
+                        ui.tags.p("Activo", class_="card-title"),
+                        ui.output_ui("ind_selector"),
+                        ui.input_date_range("ind_fechas", "Período",
+                            start="2023-01-01", end=str(date.today())),
+                        ui.input_action_button("ind_btn", "Calcular indicadores", class_="btn-primary"),
+                        class_="card",
+                    ),
+                    ui.div(
+                        ui.tags.p("Señales activas", class_="card-title"),
+                        ui.output_ui("ind_signals"),
+                        class_="card",
+                    ),
+                ),
+                ui.column(9,
+                    ui.div(ui.output_ui("ind_metrics"), class_="card"),
+                    ui.div(
+                        ui.tags.p("Precio + SMA20 + SMA50 + Bollinger", class_="card-title"),
+                        ui.output_ui("ind_chart"),
+                        class_="card",
+                    ),
+                    ui.row(
+                        ui.column(6, ui.div(ui.tags.p("RSI (14)", class_="card-title"), ui.output_ui("ind_rsi"), class_="card")),
+                        ui.column(6, ui.div(ui.tags.p("MACD + Histograma", class_="card-title"), ui.output_ui("ind_macd"), class_="card")),
+                    ),
+                ),
+            ),
+        ),
+
+        # ═══ TAB 2: RIESGO ══════════════════════════════
+        ui.nav_panel("⚠️ Riesgo",
+            ui.row(
+                ui.column(3,
+                    ui.div(
+                        ui.tags.p("Portafolio", class_="card-title"),
+                        ui.input_text("r_tickers", "Tickers (coma)", value=TICKERS_STR),
+                        ui.input_text("r_pesos",   "Pesos (coma)",   value=PESOS_DEFAULT),
+                        ui.input_slider("r_conf", "Confianza VaR", 0.90, 0.99, 0.95, step=0.01),
+                        ui.input_select("r_tipo", "Análisis", choices={
+                            "var":        "VaR & CVaR + Kupiec",
+                            "capm":       "CAPM & Beta",
+                            "markowitz":  "Markowitz QP",
+                            "volatilidad":"Volatilidad EWMA + GARCH",
+                        }),
+                        ui.input_action_button("r_btn", "Calcular", class_="btn-primary"),
+                        class_="card",
+                    ),
+                ),
+                ui.column(9, ui.div(ui.output_ui("riesgo_out"), class_="card")),
+            ),
+        ),
+
+        # ═══ TAB 3: RENTA FIJA & OPCIONES ═══════════════
+        ui.nav_panel("💰 Renta Fija & Opciones",
+            ui.navset_pill(
+                ui.nav_panel("Curva de Rendimiento",
+                    ui.row(
+                        ui.column(4,
+                            ui.div(
+                                ui.input_action_button("rf_btn", "Cargar curva FRED", class_="btn-primary"),
+                                ui.tags.br(), ui.tags.br(),
+                                ui.output_ui("rf_params"),
+                                class_="card",
+                            ),
+                        ),
+                        ui.column(8, ui.div(ui.output_ui("rf_chart"), class_="card")),
+                    ),
+                ),
+                ui.nav_panel("Bono Sintético",
+                    ui.row(
+                        ui.column(4,
+                            ui.div(
+                                ui.input_numeric("b_cupon", "Cupón anual (%)", 5.0, min=0.1, max=20, step=0.1),
+                                ui.input_numeric("b_venc",  "Vencimiento (años)", 10, min=1, max=30),
+                                ui.input_numeric("b_ytm",   "YTM (%)", 5.0, min=0.1, max=20, step=0.1),
+                                ui.input_action_button("b_btn", "Calcular duración", class_="btn-primary"),
+                                class_="card",
+                            ),
+                        ),
+                        ui.column(8, ui.div(ui.output_ui("bono_out"), class_="card")),
+                    ),
+                ),
+                ui.nav_panel("Black-Scholes & Greeks",
+                    ui.row(
+                        ui.column(4,
+                            ui.div(
+                                ui.input_numeric("bs_S",     "S — Subyacente",     150.0, min=1),
+                                ui.input_numeric("bs_K",     "K — Strike",         150.0, min=1),
+                                ui.input_numeric("bs_T",     "T — Vencimiento (años)", 0.5, min=0.01, step=0.1),
+                                ui.input_numeric("bs_r",     "r — Tasa libre (%)",  5.0, min=0),
+                                ui.input_numeric("bs_sigma", "σ — Volatilidad (%)", 20.0, min=1),
+                                ui.input_radio_buttons("bs_tipo", "Tipo",
+                                    choices={"call": "Call", "put": "Put"}),
+                                ui.input_action_button("bs_btn", "Calcular", class_="btn-primary"),
+                                class_="card",
+                            ),
+                        ),
+                        ui.column(8, ui.div(ui.output_ui("bs_out"), class_="card")),
+                    ),
+                ),
+                ui.nav_panel("Stress Testing",
+                    ui.row(
+                        ui.column(4,
+                            ui.div(
+                                ui.input_text("st_tickers", "Tickers", value=TICKERS_STR),
+                                ui.input_text("st_pesos",   "Pesos",   value=PESOS_DEFAULT),
+                                ui.input_numeric("st_var",   "VaR base (decimal)", 0.0185, min=0.001, step=0.001),
+                                ui.input_numeric("st_sigma", "Volatilidad diaria", 0.012,  min=0.001, step=0.001),
+                                ui.input_numeric("st_valor", "Valor portafolio (USD)", 100000, min=1000),
+                                ui.input_action_button("st_btn", "Aplicar escenarios", class_="btn-primary"),
+                                class_="card",
+                            ),
+                        ),
+                        ui.column(8, ui.div(ui.output_ui("stress_out"), class_="card")),
+                    ),
+                ),
+            ),
+        ),
+
+        # ═══ TAB 4: ML ══════════════════════════════════
+        ui.nav_panel("🤖 ML Predicción",
+            ui.row(
+                ui.column(4,
+                    ui.div(
+                        ui.tags.p("Features del modelo", class_="card-title"),
+                        ui.output_ui("ml_ticker_sel"),
+                        ui.input_numeric("ml_rsi",   "RSI (14)",             45.0, min=0, max=100),
+                        ui.input_numeric("ml_macd",  "MACD Histogram",        0.5, step=0.1),
+                        ui.input_numeric("ml_ewma",  "Vol. EWMA diaria",     0.012, step=0.001),
+                        ui.input_numeric("ml_r5",    "Ret. 5 días (%)",       1.2, step=0.1),
+                        ui.input_numeric("ml_r21",   "Ret. 21 días (%)",      3.5, step=0.1),
+                        ui.input_numeric("ml_pctb",  "Bollinger %B",         0.55, min=0, max=1, step=0.01),
+                        ui.input_numeric("ml_estoc", "Estocástico %K",       55.0, min=0, max=100),
+                        ui.input_action_button("ml_btn", "Predecir régimen", class_="btn-primary"),
+                        class_="card",
+                    ),
+                    ui.div(ui.output_ui("ml_status"), class_="card"),
+                ),
+                ui.column(8,
+                    ui.div(ui.output_ui("ml_out"), class_="card"),
+                    ui.div(
+                        ui.tags.p("Sobre el modelo", class_="card-title"),
+                        ui.tags.p("Propósito: Clasificación de régimen de mercado (alcista / lateral / bajista).", style="color:#94a3b8;font-size:13px"),
+                        ui.tags.p("Algoritmo: RandomForestClassifier — 200 árboles, max_depth=8, balanced classes.", style="color:#94a3b8;font-size:13px"),
+                        ui.tags.p("Entrenamiento: 80% datos históricos. Partición temporal sin shuffle para evitar data leakage.", style="color:#94a3b8;font-size:13px"),
+                        ui.tags.p("Singleton: el modelo se carga una sola vez al levantar el servidor (verificar en logs de uvicorn).", style="color:#94a3b8;font-size:13px"),
+                        class_="card",
+                    ),
+                ),
+            ),
+        ),
+
+        # ═══ TAB 5: MACRO & COMPARACIÓN ═════════════════
+        ui.nav_panel("🌐 Macro & Comparación",
+            ui.navset_pill(
+                ui.nav_panel("Indicadores Macro",
+                    ui.div(
+                        ui.input_action_button("macro_btn", "Actualizar desde FRED", class_="btn-primary"),
+                        ui.tags.br(), ui.tags.br(),
+                        ui.output_ui("macro_out"),
+                        class_="card",
+                    ),
+                ),
+                ui.nav_panel("Comparar activos",
+                    ui.row(
+                        ui.column(4,
+                            ui.div(
+                                ui.input_text("comp_tickers", "Tickers (coma)", value="AAPL,SAP.DE,EC,TM"),
+                                ui.input_date_range("comp_fechas", "Período",
+                                    start="2022-01-01", end=str(date.today())),
+                                ui.input_action_button("comp_btn", "Comparar", class_="btn-primary"),
+                                class_="card",
+                            ),
+                        ),
+                        ui.column(8, ui.div(ui.output_ui("comp_out"), class_="card")),
+                    ),
+                ),
+            ),
+        ),
+    ),
+)
+
+
+# ─────────────────────────────────────────────────────────
+# SERVER
+# ─────────────────────────────────────────────────────────
+
+def server(input, output, session):
+
+    # ── Cargar catálogo de activos al inicio ──────────────
+    @reactive.calc
+    def _catalogo():
+        data, _ = api_get("/activos")
+        if data:
+            return [a["ticker"] for a in data.get("activos", [])]
+        return TICKERS_DEFAULT
+
+    # ── Status ────────────────────────────────────────────
+    @output
+    @render.ui
+    def status_badge():
+        h, err = api_get("/")
+        if h:
+            return ui.span(f"✓ API v{h.get('version','?')} · {h.get('mensaje','ok')}", class_="status-ok")
+        return ui.span(f"✗ {err}", class_="status-err")
+
+    # ── Selector dinámico de activos ──────────────────────
+    @output
+    @render.ui
+    def ind_selector():
+        tickers = _catalogo()
+        return ui.input_select("ind_ticker", "Activo", choices=tickers, selected="AAPL")
+
+    @output
+    @render.ui
+    def ml_ticker_sel():
+        tickers = _catalogo()
+        return ui.input_select("ml_ticker", "Activo", choices=tickers, selected="AAPL")
+
+    # ════════════════════════════════════════════════════
+    # TAB 1 — INDICADORES
+    # ════════════════════════════════════════════════════
+
+    @reactive.calc
+    @reactive.event(input.ind_btn)
+    def _ind():
+        ticker = input.ind_ticker() if hasattr(input, 'ind_ticker') else "AAPL"
+        fi = str(input.ind_fechas()[0])
+        ff = str(input.ind_fechas()[1])
+        return api_get(f"/indicadores/{ticker}", {"fecha_inicio": fi, "fecha_fin": ff})
+
+    @output
+    @render.ui
+    def ind_signals():
+        data, err = _ind()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Presiona Calcular indicadores", style="color:#64748b;font-size:12px")
+        señales = data.get("señales", [])
+        if not señales: return ui.span("Sin señales activas", class_="badge-neu")
+        items = []
+        for s in señales[:8]:
+            cls = "badge-buy" if s.get("tipo") == "COMPRA" else "badge-sell"
+            items.append(ui.div(
+                ui.span(s.get("tipo",""), class_=cls),
+                ui.tags.span(f" {s.get('indicador','')} — {s.get('descripcion','')[:45]}",
+                             style="font-size:11px;color:#94a3b8;margin-left:4px"),
+                style="margin-bottom:6px",
+            ))
+        return ui.div(*items)
+
+    @output
+    @render.ui
+    def ind_metrics():
+        data, err = _ind()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Selecciona activo y presiona Calcular", style="color:#64748b")
+        res  = data.get("resumen", {})
+        ult  = (data.get("datos") or [{}])[-1]
+        rsi  = res.get("rsi_actual")
+        price = ult.get("cierre")
+        macd_p = res.get("macd_positivo", False)
+        vs20   = res.get("precio_vs_sma20", "—")
+        pct_b  = res.get("boll_pct_b")
+
+        rsi_color = "#f87171" if (rsi or 50)>70 else ("#34d399" if (rsi or 50)<30 else "#60a5fa")
+
+        def m(title, val, color="#60a5fa"):
+            return ui.column(2, ui.div(
+                ui.tags.p(title, class_="card-title"),
+                ui.tags.p(str(val) if val is not None else "—",
+                          class_="metric-big", style=f"color:{color}"),
+            ))
+        return ui.row(
+            m("Precio", f"${price:.2f}" if price else "—"),
+            m("RSI (14)", f"{rsi:.1f}" if rsi else "—", rsi_color),
+            m("MACD", "Alcista ↑" if macd_p else "Bajista ↓", "#34d399" if macd_p else "#f87171"),
+            m("vs SMA20", vs20.upper(), "#34d399" if vs20=="sobre" else "#f87171"),
+            m("Bollinger %B", f"{pct_b:.2f}" if pct_b else "—",
+              "#f87171" if (pct_b or 0)>0.8 else ("#34d399" if (pct_b or 0)<0.2 else "#60a5fa")),
+            m("Días datos", data.get("total_dias","—"), "#94a3b8"),
+        )
+
+    def _plotly_chart(html_str):
+        return ui.HTML(html_str)
+
+    @output
+    @render.ui
+    def ind_chart():
+        data, err = _ind()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Sin datos", style="color:#64748b")
+        try:
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            df = pd.DataFrame(data.get("datos", [])).dropna(subset=["cierre"])
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=df["fecha"], y=df["cierre"], name="Precio",
+                                     line=dict(color="#60a5fa", width=2)))
+            for col, color, name in [("sma_20","#f59e0b","SMA 20"),("sma_50","#a78bfa","SMA 50"),
+                                      ("boll_superior","#475569","BB Sup"),("boll_inferior","#475569","BB Inf")]:
+                if col in df.columns:
+                    fig.add_trace(go.Scatter(x=df["fecha"], y=df[col], name=name,
+                                             line=dict(color=color, width=1,
+                                                       dash="dot" if "boll" in col else "solid")))
+            fig.update_layout(height=280, paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
+                              font=dict(color="#94a3b8", size=11), margin=dict(t=20,b=20,l=40,r=10),
+                              legend=dict(orientation="h", y=1.05, bgcolor="rgba(0,0,0,0)"))
+            fig.update_xaxes(gridcolor="#2d3748")
+            fig.update_yaxes(gridcolor="#2d3748")
+            return ui.HTML(pio.to_html(fig, include_plotlyjs="cdn", full_html=False))
+        except Exception as e:
+            return ui.tags.p(str(e), style="color:#f87171;font-size:12px")
+
+    @output
+    @render.ui
+    def ind_rsi():
+        data, err = _ind()
+        if err or data is None: return ui.tags.p(err or "Sin datos", style="color:#64748b;font-size:12px")
+        try:
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            df = pd.DataFrame(data.get("datos",[])).dropna(subset=["rsi_14"])
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=df["fecha"], y=df["rsi_14"], line=dict(color="#a78bfa", width=1.5)))
+            fig.add_hline(y=70, line_dash="dash", line_color="#f87171", annotation_text="70")
+            fig.add_hline(y=30, line_dash="dash", line_color="#34d399", annotation_text="30")
+            fig.update_layout(height=180, paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
+                              font=dict(color="#94a3b8",size=10), showlegend=False,
+                              margin=dict(t=10,b=20,l=40,r=10), yaxis=dict(range=[0,100]))
+            fig.update_xaxes(gridcolor="#2d3748"); fig.update_yaxes(gridcolor="#2d3748")
+            return ui.HTML(pio.to_html(fig, include_plotlyjs=False, full_html=False))
+        except Exception as e:
+            return ui.tags.p(str(e), style="color:#f87171;font-size:11px")
+
+    @output
+    @render.ui
+    def ind_macd():
+        data, err = _ind()
+        if err or data is None: return ui.tags.p(err or "Sin datos", style="color:#64748b;font-size:12px")
+        try:
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            df = pd.DataFrame(data.get("datos",[])).dropna(subset=["macd"])
+            colors = ["#34d399" if v>=0 else "#f87171" for v in df["macd_hist"].fillna(0)]
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=df["fecha"], y=df["macd_hist"], name="Hist.", marker_color=colors))
+            fig.add_trace(go.Scatter(x=df["fecha"], y=df["macd"],       name="MACD",  line=dict(color="#60a5fa",width=1.5)))
+            fig.add_trace(go.Scatter(x=df["fecha"], y=df["macd_señal"], name="Señal", line=dict(color="#f59e0b",width=1.5)))
+            fig.update_layout(height=180, paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
+                              font=dict(color="#94a3b8",size=10),
+                              legend=dict(orientation="h",bgcolor="rgba(0,0,0,0)",font=dict(size=10)),
+                              margin=dict(t=10,b=20,l=40,r=10))
+            fig.update_xaxes(gridcolor="#2d3748"); fig.update_yaxes(gridcolor="#2d3748")
+            return ui.HTML(pio.to_html(fig, include_plotlyjs=False, full_html=False))
+        except Exception as e:
+            return ui.tags.p(str(e), style="color:#f87171;font-size:11px")
+
+    # ════════════════════════════════════════════════════
+    # TAB 2 — RIESGO
+    # ════════════════════════════════════════════════════
+
+    @reactive.calc
+    @reactive.event(input.r_btn)
+    def _riesgo():
+        try:
+            tickers = [t.strip().upper() for t in input.r_tickers().split(",") if t.strip()]
+            pesos   = [float(p.strip()) for p in input.r_pesos().split(",") if p.strip()]
+        except ValueError:
+            return "error", "Pesos deben ser números separados por coma"
+        tipo    = input.r_tipo()
+        conf    = input.r_conf()
+        payload = {"tickers": tickers, "pesos": pesos, "nivel_confianza": conf}
+        return tipo, tickers, pesos, payload
+
+    @output
+    @render.ui
+    def riesgo_out():
+        result = _riesgo()
+        if result is None or result[0] == "error":
+            msg = result[1] if result else "Configura el portafolio y presiona Calcular"
+            return ui.tags.p(msg, style="color:#64748b" if result is None else "color:#f87171")
+
+        tipo, tickers, pesos, payload = result
+
+        if tipo == "var":
+            data, err = api_post("/var", payload)
+            if err: return ui.div(ui.tags.p(err, class_="err"))
+            return _render_var(data)
+        elif tipo == "capm":
+            data, err = api_get("/capm", {"tickers": tickers, "tasa_libre_riesgo": 0.0525})
+            if err: return ui.div(ui.tags.p(err, class_="err"))
+            return _render_capm(data)
+        elif tipo == "markowitz":
+            data, err = api_post("/frontera-eficiente", payload)
+            if err: return ui.div(ui.tags.p(err, class_="err"))
+            return _render_markowitz(data)
+        elif tipo == "volatilidad":
+            data, err = api_get(f"/volatilidad/{tickers[0]}", {"lambda_ewma": 0.94})
+            if err: return ui.div(ui.tags.p(err, class_="err"))
+            return _render_garch(data)
+        return ui.tags.p("Selecciona un análisis", style="color:#64748b")
+
+    def _render_var(data):
+        if not data: return ui.tags.p("Sin datos", style="color:#64748b")
+        vp  = data.get("var_parametrico", {})
+        vh  = data.get("var_historico",   {})
+        vmc = data.get("var_montecarlo",  {})
+        rk  = data.get("resumen_kupiec",  {})
+
+        rows = []
+        for label, d in [("Paramétrico", vp), ("Histórico", vh), ("Montecarlo", vmc)]:
+            kup = d.get("kupiec", {})
+            adec = kup.get("modelo_adecuado")
+            badge = ("✅ Pasa" if adec else "❌ Falla") if adec is not None else "—"
+            lr = kup.get("LR_POF", "—")
+            rows.append(ui.tags.tr(
+                ui.tags.td(label),
+                ui.tags.td(d.get("var_porcentaje","—")),
+                ui.tags.td(fmt_usd(d.get("var_monetario_usd"))),
+                ui.tags.td(d.get("cvar_porcentaje","—")),
+                ui.tags.td(fmt_usd(d.get("cvar_monetario_usd"))),
+                ui.tags.td(badge),
+                ui.tags.td(f"{lr:.4f}" if isinstance(lr, float) else str(lr)),
+            ))
+        return ui.div(
+            ui.tags.p("VaR y CVaR — 3 métodos", class_="card-title"),
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in
+                    ["Método","VaR %","VaR USD","CVaR %","CVaR USD","Kupiec","LR_POF"]])),
+                ui.tags.tbody(*rows),
+            ),
+            ui.tags.hr(),
+            ui.tags.p("Backtesting de Kupiec (test LR_POF — χ²(1), umbral 3.841)", class_="card-title"),
+            ui.tags.p(rk.get("recomendacion","—"), style="color:#60a5fa;font-size:13px"),
+            ui.tags.p(data.get("interpretacion_general",""), style="color:#94a3b8;font-size:12px;margin-top:8px"),
+        )
+
+    def _render_capm(data):
+        if not data or "activos" not in data:
+            return ui.tags.p("Sin datos CAPM", style="color:#64748b")
+        activos = data.get("activos", {})
+        rows = []
+        for t, d in activos.items():
+            beta = d.get("beta", 0)
+            bc = "#f87171" if beta>1.2 else ("#34d399" if beta<0.8 else "#f59e0b")
+            rows.append(ui.tags.tr(
+                ui.tags.td(t),
+                ui.tags.td(ui.HTML(f'<span style="color:{bc};font-weight:600">{beta:.4f}</span>')),
+                ui.tags.td(fmt_pct(d.get("rendimiento_esperado_capm"))),
+                ui.tags.td(fmt_pct(d.get("alpha_anual"))),
+                ui.tags.td(f"{d.get('r_cuadrado',0):.4f}"),
+                ui.tags.td(d.get("interpretacion_beta","")[:45]),
+            ))
+        return ui.div(
+            ui.tags.p(f"Benchmark: {data.get('benchmark','SPY')} | Rf: {fmt_pct(data.get('tasa_libre_riesgo_anual'))} | Prima mercado: {fmt_pct(data.get('prima_riesgo_mercado'))}", style="color:#94a3b8;font-size:12px;margin-bottom:10px"),
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Ticker","Beta","E(R) CAPM","Alpha Jensen","R²","Tipo"]])),
+                ui.tags.tbody(*rows),
+            ),
+        )
+
+    def _render_markowitz(data):
+        if not data: return ui.tags.p("Sin datos", style="color:#64748b")
+        frontera = data.get("sin_corto_no_negatividad", {})
+        ms  = frontera.get("portafolio_max_sharpe", {})
+        mv  = frontera.get("portafolio_min_varianza", {})
+
+        def port_table(port, titulo):
+            p_dict = port.get("pesos", {})
+            rows_p = [ui.tags.tr(ui.tags.td(t), ui.tags.td(f"{float(v)*100:.1f}%"))
+                      for t, v in p_dict.items()]
+            color = "#34d399" if (port.get("retorno_anual") or 0) > 0 else "#f87171"
+            return ui.column(6, ui.div(
+                ui.tags.p(titulo, class_="card-title"),
+                ui.tags.p(f"Retorno: {fmt_pct(port.get('retorno_anual'))} | Vol: {fmt_pct(port.get('volatilidad_anual'))} | Sharpe: {port.get('sharpe_ratio','—'):.3f}", style=f"color:{color};font-size:12px;margin-bottom:8px"),
+                ui.tags.table(ui.tags.thead(ui.tags.tr(ui.tags.th("Ticker"),ui.tags.th("Peso"))),
+                              ui.tags.tbody(*rows_p)),
+            ))
+
+        return ui.div(
+            ui.tags.p("Frontera eficiente — Programación Cuadrática (sin ventas en corto)", class_="card-title"),
+            ui.row(port_table(ms,"Máximo Sharpe"), port_table(mv,"Mínima Varianza")),
+            ui.tags.p(data.get("comparacion",{}).get("descripcion",""), style="color:#94a3b8;font-size:12px;margin-top:10px"),
+        )
+
+    def _render_garch(data):
+        if not data: return ui.tags.p("Sin datos GARCH", style="color:#64748b")
+        garch  = data.get("garch", {})
+        modelos= garch.get("modelos", [])
+        mejor  = garch.get("mejor_por_aic","—")
+        ewma_d = data.get("ewma",{}).get("modelos_ewma",{})
+        ewma94 = ewma_d.get("ewma_lambda_0.94",{})
+
+        rows = []
+        for m in modelos:
+            if "error" in m:
+                rows.append(ui.tags.tr(ui.tags.td(m["modelo"]), ui.tags.td(m["error"], colspan="5")))
+            else:
+                star = "⭐ " if m["modelo"]==mejor else ""
+                rows.append(ui.tags.tr(
+                    ui.tags.td(f"{star}{m['modelo']}"),
+                    ui.tags.td(f"{m.get('aic','—'):.2f}"),
+                    ui.tags.td(f"{m.get('bic','—'):.2f}"),
+                    ui.tags.td(f"{m.get('alpha','—'):.4f}"),
+                    ui.tags.td(f"{m.get('beta','—'):.4f}"),
+                    ui.tags.td(fmt_pct(m.get("volatilidad_pronostico_anual"))),
+                ))
+        return ui.div(
+            ui.tags.p(f"EWMA λ=0.94 — Volatilidad anualizada: {fmt_pct(ewma94.get('vol_ultimo_anual'))}", style="color:#34d399;font-weight:600;margin-bottom:12px"),
+            ui.tags.p("ARCH/GARCH — Tabla comparativa AIC/BIC", class_="card-title"),
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Modelo","AIC","BIC","α","β","Vol. pronóstico"]])),
+                ui.tags.tbody(*rows),
+            ),
+            ui.tags.p(garch.get("interpretacion",""), style="color:#60a5fa;font-size:12px;margin-top:10px"),
+        )
+
+    # ════════════════════════════════════════════════════
+    # TAB 3 — RENTA FIJA & OPCIONES
+    # ════════════════════════════════════════════════════
+
+    @reactive.calc
+    @reactive.event(input.rf_btn)
+    def _rf(): return api_get("/curva-rendimiento")
+
+    @output
+    @render.ui
+    def rf_params():
+        data, err = _rf()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Presiona el botón", style="color:#64748b;font-size:12px")
+        params = data.get("parametros", {})
+        interp = data.get("interpretacion_parametros", {})
+        return ui.div(
+            ui.tags.p(f"RMSE: {data.get('rmse_ajuste_pct','—'):.4f}%", style="color:#34d399;font-weight:600"),
+            ui.tags.p(f"Forma: {data.get('forma_curva','—')}", style="color:#f59e0b;font-size:12px"),
+            ui.tags.hr(),
+            *[ui.tags.p(v, style="color:#94a3b8;font-size:11px;margin-bottom:4px") for v in interp.values()],
+        )
+
+    @output
+    @render.ui
+    def rf_chart():
+        data, err = _rf()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Presiona Cargar curva FRED", style="color:#64748b")
+        try:
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            obs = pd.DataFrame(data.get("curva_observada", []))
+            fit = pd.DataFrame(data.get("curva_ajustada",  []))
+            fig = go.Figure()
+            if not obs.empty:
+                fig.add_trace(go.Scatter(x=obs["vencimiento"], y=obs["rendimiento_obs"],
+                    mode="markers+lines", name="Observada (FRED)",
+                    marker=dict(color="#60a5fa",size=8), line=dict(color="#60a5fa",dash="dot")))
+            if not fit.empty:
+                fig.add_trace(go.Scatter(x=fit["vencimiento"], y=fit["rendimiento_fit"],
+                    mode="lines", name="Nelson-Siegel", line=dict(color="#34d399",width=2.5)))
+            fig.update_layout(height=320, paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
+                              font=dict(color="#94a3b8",size=11), xaxis_title="Vencimiento (años)",
+                              yaxis_title="Rendimiento (%)",
+                              legend=dict(orientation="h",bgcolor="rgba(0,0,0,0)"),
+                              margin=dict(t=20,b=40,l=50,r=10))
+            fig.update_xaxes(gridcolor="#2d3748"); fig.update_yaxes(gridcolor="#2d3748")
+            return ui.HTML(pio.to_html(fig, include_plotlyjs="cdn", full_html=False))
+        except Exception as e:
+            return ui.tags.p(str(e), style="color:#f87171;font-size:12px")
+
+    @reactive.calc
+    @reactive.event(input.b_btn)
+    def _bono():
+        return api_post("/bono/duracion", {
+            "cupon_anual":       input.b_cupon() / 100,
+            "vencimiento_anios": int(input.b_venc()),
+            "valor_nominal":     1000.0,
+            "ytm":               input.b_ytm() / 100,
+            "pagos_por_anio":    2,
+        })
+
+    @output
+    @render.ui
+    def bono_out():
+        data, err = _bono()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Configura y presiona Calcular duración", style="color:#64748b")
+        shocks = data.get("sensibilidad_shocks", [])
+        rows = [ui.tags.tr(
+            ui.tags.td(f"{int(s.get('shock_pb',0)):+d} pb"),
+            ui.tags.td(f"{s['dp_lineal']*100:.3f}%"),
+            ui.tags.td(f"{s['dp_duracion_convexidad']*100:.3f}%"),
+            ui.tags.td(f"{s['dp_reprice_exacto']*100:.3f}%"),
+            ui.tags.td(f"${s['precio_nuevo']:.2f}"),
+        ) for s in shocks]
+        return ui.div(
+            ui.row(
+                ui.column(3, ui.div(ui.tags.p("Precio", class_="card-title"), ui.tags.p(f"${data.get('precio',0):.4f}", class_="metric-big"))),
+                ui.column(3, ui.div(ui.tags.p("D. Macaulay (años)", class_="card-title"), ui.tags.p(f"{data.get('duracion_macaulay_anios',0):.4f}", class_="metric-big metric-pos"))),
+                ui.column(3, ui.div(ui.tags.p("D. Modificada", class_="card-title"), ui.tags.p(f"{data.get('duracion_modificada',0):.4f}", class_="metric-big metric-neu"))),
+                ui.column(3, ui.div(ui.tags.p("Convexidad", class_="card-title"), ui.tags.p(f"{data.get('convexidad',0):.2f}", class_="metric-big", style="color:#a78bfa"))),
+            ),
+            ui.tags.hr(),
+            ui.tags.p("Sensibilidad ante shocks — 3 aproximaciones", class_="card-title"),
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Shock","ΔP Lineal","ΔP D+C","ΔP Exacto","Precio nuevo"]])),
+                ui.tags.tbody(*rows),
+            ),
+        )
+
+    @reactive.calc
+    @reactive.event(input.bs_btn)
+    def _bs():
+        return api_post("/opcion/precio", {
+            "S": float(input.bs_S()), "K": float(input.bs_K()),
+            "T": float(input.bs_T()), "r": input.bs_r()/100,
+            "sigma": input.bs_sigma()/100, "tipo": input.bs_tipo(),
+        })
+
+    @output
+    @render.ui
+    def bs_out():
+        data, err = _bs()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Ingresa parámetros y presiona Calcular", style="color:#64748b")
+        g = data.get("greeks", {})
+        interp = data.get("interpretacion_greeks", {})
+        paridad = data.get("paridad_put_call", {})
+        return ui.div(
+            ui.row(
+                ui.column(3, ui.div(ui.tags.p("Precio opción", class_="card-title"), ui.tags.p(f"${data.get('precio',0):.4f}", class_="metric-big metric-pos"))),
+                ui.column(3, ui.div(ui.tags.p("d₁", class_="card-title"), ui.tags.p(f"{data.get('d1',0):.4f}", class_="metric-big"))),
+                ui.column(3, ui.div(ui.tags.p("d₂", class_="card-title"), ui.tags.p(f"{data.get('d2',0):.4f}", class_="metric-big"))),
+                ui.column(3, ui.div(
+                    ui.tags.p("Paridad put-call", class_="card-title"),
+                    ui.tags.p("✅ Verificada" if paridad.get("verificada") else "❌ Error",
+                              style=f"color:{'#34d399' if paridad.get('verificada') else '#f87171'};font-weight:600"),
+                    ui.tags.p(f"Error numérico: {paridad.get('error_numerico','—'):.2e}", style="color:#64748b;font-size:11px"),
+                )),
+            ),
+            ui.tags.hr(),
+            ui.tags.p("Las 5 Greeks", class_="card-title"),
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Greek","Símbolo","Valor","Interpretación"]])),
+                ui.tags.tbody(*[
+                    ui.tags.tr(
+                        ui.tags.td(n.title()), ui.tags.td(sym),
+                        ui.tags.td(ui.HTML(f'<span style="color:#60a5fa;font-weight:600">{g.get(n,"—"):.6f}</span>')),
+                        ui.tags.td(interp.get(n,"—"), style="font-size:11px;color:#94a3b8"),
+                    ) for n, sym in [("delta","Δ"),("gamma","Γ"),("vega","ν"),("theta","Θ"),("rho","ρ")]
+                ]),
+            ),
+        )
+
+    @reactive.calc
+    @reactive.event(input.st_btn)
+    def _stress():
+        try:
+            tickers = [t.strip().upper() for t in input.st_tickers().split(",") if t.strip()]
+            pesos   = [float(p.strip()) for p in input.st_pesos().split(",") if p.strip()]
+        except ValueError:
+            return None, "Pesos inválidos"
+        return api_post("/stress", {
+            "tickers": tickers, "pesos": pesos, "betas": {},
+            "var_base": float(input.st_var()), "sigma_base": float(input.st_sigma()),
+            "valor_portafolio": float(input.st_valor()),
+        })
+
+    @output
+    @render.ui
+    def stress_out():
+        data, err = _stress()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Configura y presiona Aplicar escenarios", style="color:#64748b")
+        escenarios = data.get("escenarios", {})
+        labels = {
+            "tasa_menos_200pb":"Tasa −200pb","tasa_mas_200pb":"Tasa +200pb",
+            "caida_mercado_20pct":"Caída −20%","caida_mercado_30pct":"Caída −30%",
+            "volatilidad_doble":"Volatilidad ×2","combinado_tormenta_perfecta":"⚡ Tormenta perfecta",
+        }
+        rows = []
+        for key, esc in escenarios.items():
+            perdida = esc.get("perdida_total_pct") or esc.get("perdida_portafolio_pct", 0) or 0
+            usd     = esc.get("perdida_total_usd") or esc.get("perdida_portafolio_usd", 0) or 0
+            rows.append(ui.tags.tr(
+                ui.tags.td(labels.get(key, key)),
+                ui.tags.td(esc.get("shock_descripcion","—")),
+                ui.tags.td(ui.HTML(f'<span style="color:#f87171;font-weight:600">{float(perdida):.2f}%</span>')),
+                ui.tags.td(fmt_usd(float(usd) if usd else 0)),
+            ))
+        return ui.div(
+            ui.tags.p(f"VaR base: {data.get('var_base_pct',0):.3f}% | Portafolio: {fmt_usd(data.get('valor_portafolio_usd'))}", style="color:#94a3b8;font-size:12px;margin-bottom:10px"),
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Escenario","Shock","Pérdida %","Pérdida USD"]])),
+                ui.tags.tbody(*rows),
+            ),
+            ui.tags.p(data.get("interpretacion",""), style="color:#94a3b8;font-size:12px;margin-top:10px"),
+        )
+
+    # ════════════════════════════════════════════════════
+    # TAB 4 — ML
+    # ════════════════════════════════════════════════════
+
+    @output
+    @render.ui
+    def ml_status():
+        data, err = api_get("/predict/status")
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if not data: return ui.tags.p("Sin estado", style="color:#64748b;font-size:12px")
+        disp = data.get("disponible", False)
+        return ui.div(
+            ui.tags.p("✅ Modelo cargado" if disp else "⚠️ Modelo no disponible",
+                      style=f"color:{'#34d399' if disp else '#f59e0b'};font-weight:600"),
+            ui.tags.p(f"Versión: {data.get('model_version','—')}", style="color:#94a3b8;font-size:11px"),
+            ui.tags.p(f"Singleton ID: {data.get('singleton_id','—')}", style="color:#64748b;font-size:10px"),
+            ui.tags.p("Llamar /predict 3 veces → 'modelo cargado' aparece solo 1 vez en logs de uvicorn",
+                      style="color:#64748b;font-size:10px;margin-top:4px"),
+        )
+
+    @reactive.calc
+    @reactive.event(input.ml_btn)
+    def _ml():
+        ticker = input.ml_ticker() if hasattr(input, 'ml_ticker') else "AAPL"
+        features = [
+            float(input.ml_rsi()),
+            float(input.ml_macd()),
+            float(input.ml_ewma()),
+            float(input.ml_r5())  / 100,
+            float(input.ml_r21()) / 100,
+            float(input.ml_pctb()),
+            float(input.ml_estoc()),
+        ]
+        return api_post("/predict", {"ticker": ticker, "features": features}), features
+
+    @output
+    @render.ui
+    def ml_out():
+        result = _ml()
+        if result is None:
+            return ui.tags.p("Ingresa features y presiona Predecir régimen", style="color:#64748b")
+        (data, err), features = result
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Sin respuesta del modelo", style="color:#64748b")
+
+        pred  = data.get("prediction", 0)
+        label = data.get("prediction_label", "—")
+        colors = {1.0:"#34d399", 0.0:"#f59e0b", -1.0:"#f87171"}
+        color  = colors.get(float(pred), "#60a5fa")
+        fnames = data.get("feature_names") or ["rsi_14","macd_hist","ewma_vol","ret_5d","ret_21d","pct_b_bollinger","estocastico_k"]
+        if not fnames:
+            fnames = ["rsi_14","macd_hist","ewma_vol","ret_5d","ret_21d","pct_b_bollinger","estocastico_k"]
+
+        rows_f = [ui.tags.tr(ui.tags.td(fn), ui.tags.td(f"{fv:.6f}"))
+                  for fn, fv in zip(fnames, features)]
+        return ui.div(
+            ui.tags.p(label, style=f"color:{color};font-size:36px;font-weight:700;text-align:center;margin:16px 0;font-family:'IBM Plex Mono',monospace"),
+            ui.tags.p(f"Activo: {data.get('ticker','—')} | Modelo: {data.get('model_version','—')}",
+                      style="color:#94a3b8;font-size:12px;text-align:center"),
+            ui.tags.hr(),
+            ui.tags.p("Features enviadas al modelo", class_="card-title"),
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(ui.tags.th("Feature"), ui.tags.th("Valor"))),
+                ui.tags.tbody(*rows_f),
+            ),
+        )
+
+    # ════════════════════════════════════════════════════
+    # TAB 5 — MACRO & COMPARACIÓN
+    # ════════════════════════════════════════════════════
+
+    @reactive.calc
+    @reactive.event(input.macro_btn)
+    def _macro(): return api_get("/macro")
+
+    @output
+    @render.ui
+    def macro_out():
+        data, err = _macro()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Presiona Actualizar desde FRED", style="color:#64748b")
+        datos = data.get("datos", {})
+        iconos = {"DGS3MO":"📉","DGS10":"📊","CPIAUCSL":"📈","UNRATE":"👷","FEDFUNDS":"🏦","VIXCLS":"⚡"}
+        cards = []
+        for serie, info in datos.items():
+            if serie.startswith("_"): continue
+            valor = info.get("valor")
+            cards.append(ui.column(4, ui.div(
+                ui.tags.p(f"{iconos.get(serie,'📌')} {info.get('nombre',serie)}", class_="card-title"),
+                ui.tags.p(f"{valor:.2f}%" if valor else "—", class_="metric-big"),
+                ui.tags.p(info.get("fecha","—"), style="color:#64748b;font-size:11px"),
+                ui.tags.p(info.get("interpretacion",""), style="color:#94a3b8;font-size:11px;margin-top:4px"),
+                class_="card",
+            )))
+        ctx = data.get("contexto_macro", {})
+        return ui.div(
+            ui.row(*cards),
+            ui.div(
+                ui.tags.p("Contexto macro integrado", class_="card-title"),
+                ui.tags.p(ctx.get("descripcion",""), style="color:#94a3b8;font-size:13px"),
+                *[ui.tags.p(f"→ {i}", style="color:#60a5fa;font-size:12px") for i in ctx.get("impacto_portafolio",[])],
+                class_="card",
+            ),
+        )
+
+    @reactive.calc
+    @reactive.event(input.comp_btn)
+    def _comp():
+        tickers = [t.strip().upper() for t in input.comp_tickers().split(",") if t.strip()]
+        fi = str(input.comp_fechas()[0])
+        ff = str(input.comp_fechas()[1])
+        return api_get("/comparar", {"tickers": tickers, "fecha_inicio": fi, "fecha_fin": ff})
+
+    @output
+    @render.ui
+    def comp_out():
+        data, err = _comp()
+        if err: return ui.div(ui.tags.p(err, class_="err"))
+        if data is None: return ui.tags.p("Ingresa tickers y presiona Comparar", style="color:#64748b")
+        comp = data.get("comparacion", {})
+        rows = []
+        for ticker, d in sorted(comp.items(), key=lambda x: x[1].get("sharpe_ratio") or 0, reverse=True):
+            ret    = d.get("retorno_total", 0) or 0
+            sharpe = d.get("sharpe_ratio", 0) or 0
+            rc = "#34d399" if ret>0 else "#f87171"
+            sc = "#34d399" if sharpe>0 else "#f87171"
+            rows.append(ui.tags.tr(
+                ui.tags.td(f"#{d.get('ranking_sharpe',0)} {ticker}"),
+                ui.tags.td(d.get("nombre","")[:22]),
+                ui.tags.td(d.get("pais","—")),
+                ui.tags.td(ui.HTML(f'<span style="color:{rc};font-weight:600">{ret*100:.1f}%</span>')),
+                ui.tags.td(fmt_pct(d.get("volatilidad_anual"))),
+                ui.tags.td(ui.HTML(f'<span style="color:{sc};font-weight:600">{sharpe:.3f}</span>')),
+                ui.tags.td(fmt_pct(d.get("max_drawdown"))),
+                ui.tags.td(d.get("tendencia_ema","—")),
+            ))
+        return ui.div(
+            ui.tags.p(f"Mejor Sharpe: {data.get('mejor_sharpe','—')} | Mayor retorno: {data.get('mejor_retorno','—')} | Menor vol: {data.get('menor_volatilidad','—')}",
+                      style="color:#60a5fa;font-size:12px;font-weight:600;margin-bottom:10px"),
+            ui.tags.table(
+                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in
+                    ["Ranking","Nombre","País","Retorno","Volatilidad","Sharpe","Max DD","Tendencia"]])),
+                ui.tags.tbody(*rows),
+            ),
+        )
+
+
+app = App(app_ui, server)
