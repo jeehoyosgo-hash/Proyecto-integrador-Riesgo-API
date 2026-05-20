@@ -532,115 +532,185 @@ def server(input, output, session):
         vmc = data.get("var_montecarlo",  {})
         rk  = data.get("resumen_kupiec",  {})
 
-        rows = []
-        for label, d in [("Paramétrico", vp), ("Histórico", vh), ("Montecarlo", vmc)]:
-            kup = d.get("kupiec", {})
+        def fila(label, d):
+            kup  = d.get("kupiec", {})
             adec = kup.get("modelo_adecuado")
-            badge = ("✅ Pasa" if adec else "❌ Falla") if adec is not None else "—"
-            lr = kup.get("LR_POF", "—")
-            rows.append(ui.tags.tr(
-                ui.tags.td(label),
-                ui.tags.td(d.get("var_porcentaje","—")),
-                ui.tags.td(fmt_usd(d.get("var_monetario_usd"))),
-                ui.tags.td(d.get("cvar_porcentaje","—")),
-                ui.tags.td(fmt_usd(d.get("cvar_monetario_usd"))),
-                ui.tags.td(badge),
-                ui.tags.td(f"{lr:.4f}" if isinstance(lr, float) else str(lr)),
-            ))
+            badge = "Pasa" if adec else ("Falla" if adec is not None else "—")
+            lr   = kup.get("LR_POF", "—")
+            lr_s = f"{lr:.4f}" if isinstance(lr, float) else str(lr)
+            color = "#34d399" if adec else "#f87171"
+            return f"""<tr>
+                <td style="color:#e2e8f0">{label}</td>
+                <td style="color:#60a5fa">{d.get("var_porcentaje") or "—"}</td>
+                <td style="color:#e2e8f0">{fmt_usd(d.get("var_monetario_usd"))}</td>
+                <td style="color:#a78bfa">{d.get("cvar_porcentaje") or "—"}</td>
+                <td style="color:#e2e8f0">{fmt_usd(d.get("cvar_monetario_usd"))}</td>
+                <td style="color:{color};font-weight:600">{badge}</td>
+                <td style="color:#94a3b8">{lr_s}</td>
+            </tr>"""
+
+        tabla_html = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#1e293b">
+                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+                         for h in ["Metodo","VaR %","VaR USD","CVaR %","CVaR USD","Kupiec","LR_POF"])}
+            </tr></thead>
+            <tbody>
+                {fila("Parametrico", vp)}
+                {fila("Historico", vh)}
+                {fila("Montecarlo", vmc)}
+            </tbody>
+        </table>"""
+
         return ui.div(
-            ui.tags.p("VaR y CVaR — 3 métodos", class_="card-title"),
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in
-                    ["Método","VaR %","VaR USD","CVaR %","CVaR USD","Kupiec","LR_POF"]])),
-                ui.tags.tbody(*rows),
-            ),
+            ui.tags.p("VaR y CVaR — 3 metodos", class_="card-title"),
+            ui.HTML(tabla_html),
             ui.tags.hr(),
-            ui.tags.p("Backtesting de Kupiec (test LR_POF — χ²(1), umbral 3.841)", class_="card-title"),
-            ui.tags.p(rk.get("recomendacion","—"), style="color:#60a5fa;font-size:13px"),
-            ui.tags.p(data.get("interpretacion_general",""), style="color:#94a3b8;font-size:12px;margin-top:8px"),
+            ui.tags.p("Backtesting de Kupiec (LR_POF — umbral 3.841)", class_="card-title"),
+            ui.tags.p(str(rk.get("recomendacion","—")), style="color:#60a5fa;font-size:13px"),
+            ui.tags.p(str(data.get("interpretacion_general","—")), style="color:#94a3b8;font-size:12px;margin-top:8px"),
         )
+
 
     def _render_capm(data):
         if not data or "activos" not in data:
             return ui.tags.p("Sin datos CAPM", style="color:#64748b")
         activos = data.get("activos", {})
-        rows = []
+        if not activos:
+            return ui.tags.p("Sin activos calculados (datos insuficientes)", style="color:#f87171")
+
+        filas = ""
         for t, d in activos.items():
-            beta = d.get("beta", 0)
-            bc = "#f87171" if beta>1.2 else ("#34d399" if beta<0.8 else "#f59e0b")
-            rows.append(ui.tags.tr(
-                ui.tags.td(t),
-                ui.tags.td(ui.HTML(f'<span style="color:{bc};font-weight:600">{beta:.4f}</span>')),
-                ui.tags.td(fmt_pct(d.get("rendimiento_esperado_capm"))),
-                ui.tags.td(fmt_pct(d.get("alpha_anual"))),
-                ui.tags.td(f"{d.get('r_cuadrado',0):.4f}"),
-                ui.tags.td(d.get("interpretacion_beta","")[:45]),
-            ))
+            beta  = d.get("beta") or 0
+            er    = fmt_pct(d.get("rendimiento_esperado_capm"))
+            alpha = fmt_pct(d.get("alpha_anual"))
+            r2    = f"{float(d.get('r_cuadrado') or 0):.4f}"
+            tipo  = str(d.get("interpretacion_beta",""))[:45]
+            bc    = "#f87171" if beta>1.2 else ("#34d399" if beta<0.8 else "#f59e0b")
+            filas += f"""<tr>
+                <td style="color:#e2e8f0;padding:9px 12px">{t}</td>
+                <td style="color:{bc};font-weight:600;padding:9px 12px">{beta:.4f}</td>
+                <td style="color:#60a5fa;padding:9px 12px">{er}</td>
+                <td style="color:#a78bfa;padding:9px 12px">{alpha}</td>
+                <td style="color:#94a3b8;padding:9px 12px">{r2}</td>
+                <td style="color:#94a3b8;padding:9px 12px;font-size:11px">{tipo}</td>
+            </tr>"""
+
+        tabla_html = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#1e293b">
+                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+                         for h in ["Ticker","Beta","E(R) CAPM","Alpha Jensen","R2","Tipo"])}
+            </tr></thead>
+            <tbody>{filas}</tbody>
+        </table>"""
+
+        rf    = fmt_pct(data.get("tasa_libre_riesgo_anual"))
+        prima = fmt_pct(data.get("prima_riesgo_mercado") or data.get("prima_riesgo_mercado_pct"))
         return ui.div(
-            ui.tags.p(f"Benchmark: {data.get('benchmark','SPY')} | Rf: {fmt_pct(data.get('tasa_libre_riesgo_anual'))} | Prima mercado: {fmt_pct(data.get('prima_riesgo_mercado'))}", style="color:#94a3b8;font-size:12px;margin-bottom:10px"),
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Ticker","Beta","E(R) CAPM","Alpha Jensen","R²","Tipo"]])),
-                ui.tags.tbody(*rows),
-            ),
+            ui.tags.p(f"Benchmark: {data.get('benchmark','SPY')} | Rf: {rf} | Prima mercado: {prima}",
+                      style="color:#94a3b8;font-size:12px;margin-bottom:10px"),
+            ui.HTML(tabla_html),
         )
+
 
     def _render_markowitz(data):
         if not data: return ui.tags.p("Sin datos", style="color:#64748b")
-        frontera = data.get("sin_corto_no_negatividad", {})
-        ms  = frontera.get("portafolio_max_sharpe", {})
-        mv  = frontera.get("portafolio_min_varianza", {})
+        ms = data.get("portafolio_max_sharpe", {})
+        mv = data.get("portafolio_min_varianza", {})
 
-        def port_table(port, titulo):
-            p_dict = port.get("pesos", {})
-            rows_p = [ui.tags.tr(ui.tags.td(t), ui.tags.td(f"{float(v)*100:.1f}%"))
-                      for t, v in p_dict.items()]
-            color = "#34d399" if (port.get("retorno_anual") or 0) > 0 else "#f87171"
-            return ui.column(6, ui.div(
-                ui.tags.p(titulo, class_="card-title"),
-                ui.tags.p(f"Retorno: {fmt_pct(port.get('retorno_anual'))} | Vol: {fmt_pct(port.get('volatilidad_anual'))} | Sharpe: {port.get('sharpe_ratio','—'):.3f}", style=f"color:{color};font-size:12px;margin-bottom:8px"),
-                ui.tags.table(ui.tags.thead(ui.tags.tr(ui.tags.th("Ticker"),ui.tags.th("Peso"))),
-                              ui.tags.tbody(*rows_p)),
-            ))
+        def tabla_pesos(port):
+            pesos = port.get("pesos", {})
+            if not pesos:
+                return "<tr><td style='color:#94a3b8;padding:8px'>Sin datos</td></tr>"
+            return "".join(
+                f"<tr><td style='color:#e2e8f0;padding:7px 12px'>{t}</td>"
+                f"<td style='color:#60a5fa;padding:7px 12px;font-weight:600'>{float(v)*100:.1f}%</td></tr>"
+                for t, v in pesos.items()
+            )
+
+        def color_ret(port):
+            return "#34d399" if (port.get("retorno_anual") or 0) > 0 else "#f87171"
+
+        html = f"""
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div>
+                <p style="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:6px">Maximo Sharpe</p>
+                <p style="color:{color_ret(ms)};font-size:12px;margin-bottom:8px">
+                    Retorno: {fmt_pct(ms.get("retorno_anual"))} | Vol: {fmt_pct(ms.get("volatilidad_anual"))} | Sharpe: {ms.get("sharpe_ratio") or 0:.3f}
+                </p>
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="background:#1e293b">
+                        <th style="color:#94a3b8;padding:7px 12px;text-align:left;font-size:11px">Ticker</th>
+                        <th style="color:#94a3b8;padding:7px 12px;text-align:left;font-size:11px">Peso</th>
+                    </tr></thead>
+                    <tbody>{tabla_pesos(ms)}</tbody>
+                </table>
+            </div>
+            <div>
+                <p style="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:6px">Minima Varianza</p>
+                <p style="color:{color_ret(mv)};font-size:12px;margin-bottom:8px">
+                    Retorno: {fmt_pct(mv.get("retorno_anual"))} | Vol: {fmt_pct(mv.get("volatilidad_anual"))} | Sharpe: {mv.get("sharpe_ratio") or 0:.3f}
+                </p>
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="background:#1e293b">
+                        <th style="color:#94a3b8;padding:7px 12px;text-align:left;font-size:11px">Ticker</th>
+                        <th style="color:#94a3b8;padding:7px 12px;text-align:left;font-size:11px">Peso</th>
+                    </tr></thead>
+                    <tbody>{tabla_pesos(mv)}</tbody>
+                </table>
+            </div>
+        </div>"""
 
         return ui.div(
-            ui.tags.p("Frontera eficiente — Programación Cuadrática (sin ventas en corto)", class_="card-title"),
-            ui.row(port_table(ms,"Máximo Sharpe"), port_table(mv,"Mínima Varianza")),
-            ui.tags.p(data.get("comparacion",{}).get("descripcion",""), style="color:#94a3b8;font-size:12px;margin-top:10px"),
+            ui.tags.p("Frontera eficiente — Programacion Cuadratica (sin ventas en corto)", class_="card-title"),
+            ui.HTML(html),
         )
+
 
     def _render_garch(data):
         if not data: return ui.tags.p("Sin datos GARCH", style="color:#64748b")
-        garch  = data.get("garch", {})
-        modelos= garch.get("modelos", [])
-        mejor  = garch.get("mejor_por_aic","—")
-        ewma_d = data.get("ewma",{}).get("modelos_ewma",{})
-        ewma94 = ewma_d.get("ewma_lambda_0.94",{})
+        garch   = data.get("garch", {})
+        modelos = garch.get("modelos", [])
+        mejor   = garch.get("mejor_por_aic","—")
+        ewma_d  = data.get("ewma",{}).get("modelos_ewma",{})
+        ewma94  = ewma_d.get("ewma_lambda_0.94",{})
 
-        rows = []
+        filas = ""
         for m in modelos:
+            star = "* " if m.get("modelo") == mejor else ""
             if "error" in m:
-                rows.append(ui.tags.tr(ui.tags.td(m["modelo"]), ui.tags.td(m["error"], colspan="5")))
+                filas += f"<tr><td style='color:#e2e8f0;padding:9px 12px'>{star}{m['modelo']}</td><td colspan='5' style='color:#f87171;padding:9px 12px'>Error: {str(m['error'])[:60]}</td></tr>"
             else:
-                star = "⭐ " if m["modelo"]==mejor else ""
-                rows.append(ui.tags.tr(
-                    ui.tags.td(f"{star}{m['modelo']}"),
-                    ui.tags.td(f"{m.get('aic','—'):.2f}"),
-                    ui.tags.td(f"{m.get('bic','—'):.2f}"),
-                    ui.tags.td(f"{m.get('alpha','—'):.4f}"),
-                    ui.tags.td(f"{m.get('beta','—'):.4f}"),
-                    ui.tags.td(fmt_pct(m.get("volatilidad_pronostico_anual"))),
-                ))
+                filas += f"""<tr>
+                    <td style="color:#e2e8f0;padding:9px 12px;font-weight:{'600' if star else '400'}">{star}{m['modelo']}</td>
+                    <td style="color:#60a5fa;padding:9px 12px">{float(m.get('aic') or 0):.2f}</td>
+                    <td style="color:#94a3b8;padding:9px 12px">{float(m.get('bic') or 0):.2f}</td>
+                    <td style="color:#a78bfa;padding:9px 12px">{float(m.get('alpha') or 0):.4f}</td>
+                    <td style="color:#94a3b8;padding:9px 12px">{float(m.get('beta') or 0):.4f}</td>
+                    <td style="color:#34d399;padding:9px 12px">{fmt_pct(m.get('vol_pronostico_anual'))}</td>
+                </tr>"""
+
+        tabla_html = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#1e293b">
+                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+                         for h in ["Modelo","AIC","BIC","Alpha","Beta","Vol. Pronostico"])}
+            </tr></thead>
+            <tbody>{filas}</tbody>
+        </table>"""
+
+        vol_anual = fmt_pct(ewma94.get("vol_ultimo_anual"))
         return ui.div(
-            ui.tags.p(f"EWMA λ=0.94 — Volatilidad anualizada: {fmt_pct(ewma94.get('vol_ultimo_anual'))}", style="color:#34d399;font-weight:600;margin-bottom:12px"),
+            ui.tags.p(f"EWMA lambda=0.94 — Volatilidad anualizada: {vol_anual}",
+                      style="color:#34d399;font-weight:600;margin-bottom:12px"),
             ui.tags.p("ARCH/GARCH — Tabla comparativa AIC/BIC", class_="card-title"),
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Modelo","AIC","BIC","α","β","Vol. pronóstico"]])),
-                ui.tags.tbody(*rows),
-            ),
-            ui.tags.p(garch.get("interpretacion",""), style="color:#60a5fa;font-size:12px;margin-top:10px"),
+            ui.HTML(tabla_html),
+            ui.tags.p(str(garch.get("interpretacion","—")),
+                      style="color:#60a5fa;font-size:12px;margin-top:10px"),
         )
 
-    # ════════════════════════════════════════════════════
+
     # TAB 3 — RENTA FIJA & OPCIONES
     # ════════════════════════════════════════════════════
 

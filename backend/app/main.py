@@ -494,7 +494,7 @@ async def obtener_volatilidad(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/var", response_model=VarResponse, tags=["Capa 2 — Riesgo"])
+@app.post("/var", tags=["Capa 2 — Riesgo"])
 async def calcular_var(
     portafolio: PortafolioRequest,
     svc = Depends(get_risk_calculator),
