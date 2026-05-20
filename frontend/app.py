@@ -780,26 +780,39 @@ def server(input, output, session):
         if err: return ui.div(ui.tags.p(err, class_="err"))
         if data is None: return ui.tags.p("Configura y presiona Calcular duración", style="color:#64748b")
         shocks = data.get("sensibilidad_shocks", [])
-        rows = [ui.tags.tr(
-            ui.tags.td(f"{int(s.get('shock_pb',0)):+d} pb"),
-            ui.tags.td(f"{s['dp_lineal']*100:.3f}%"),
-            ui.tags.td(f"{s['dp_duracion_convexidad']*100:.3f}%"),
-            ui.tags.td(f"{s['dp_reprice_exacto']*100:.3f}%"),
-            ui.tags.td(f"${s['precio_nuevo']:.2f}"),
-        ) for s in shocks]
+        filas_bono = ""
+        for s in shocks:
+            shock_pb = int(s.get("shock_pb", 0))
+            color_s = "#34d399" if shock_pb < 0 else "#f87171"
+            dp_lin = s.get("dp_lineal", 0) or 0
+            dp_dc  = s.get("dp_duracion_convexidad", 0) or 0
+            dp_ex  = s.get("dp_reprice_exacto", 0) or 0
+            p_new  = s.get("precio_nuevo", 0) or 0
+            filas_bono += f"""<tr>
+                <td style="color:{color_s};font-weight:600;padding:9px 12px">{shock_pb:+d} pb</td>
+                <td style="color:#94a3b8;padding:9px 12px">{float(dp_lin)*100:.3f}%</td>
+                <td style="color:#60a5fa;padding:9px 12px">{float(dp_dc)*100:.3f}%</td>
+                <td style="color:#34d399;padding:9px 12px">{float(dp_ex)*100:.3f}%</td>
+                <td style="color:#e2e8f0;padding:9px 12px">${float(p_new):.2f}</td>
+            </tr>"""
+        tabla_bono = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#1e293b">
+                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+                         for h in ["Shock","dP Lineal","dP D+C","dP Exacto","Precio nuevo"])}
+            </tr></thead>
+            <tbody>{filas_bono}</tbody>
+        </table>"""
         return ui.div(
             ui.row(
                 ui.column(3, ui.div(ui.tags.p("Precio", class_="card-title"), ui.tags.p(f"${data.get('precio',0):.4f}", class_="metric-big"))),
-                ui.column(3, ui.div(ui.tags.p("D. Macaulay (años)", class_="card-title"), ui.tags.p(f"{data.get('duracion_macaulay_anios',0):.4f}", class_="metric-big metric-pos"))),
+                ui.column(3, ui.div(ui.tags.p("D. Macaulay (anos)", class_="card-title"), ui.tags.p(f"{data.get('duracion_macaulay_anios',0):.4f}", class_="metric-big metric-pos"))),
                 ui.column(3, ui.div(ui.tags.p("D. Modificada", class_="card-title"), ui.tags.p(f"{data.get('duracion_modificada',0):.4f}", class_="metric-big metric-neu"))),
                 ui.column(3, ui.div(ui.tags.p("Convexidad", class_="card-title"), ui.tags.p(f"{data.get('convexidad',0):.2f}", class_="metric-big", style="color:#a78bfa"))),
             ),
             ui.tags.hr(),
             ui.tags.p("Sensibilidad ante shocks — 3 aproximaciones", class_="card-title"),
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Shock","ΔP Lineal","ΔP D+C","ΔP Exacto","Precio nuevo"]])),
-                ui.tags.tbody(*rows),
-            ),
+            ui.HTML(tabla_bono),
         )
 
     @reactive.calc
@@ -872,23 +885,29 @@ def server(input, output, session):
             "caida_mercado_20pct":"Caída −20%","caida_mercado_30pct":"Caída −30%",
             "volatilidad_doble":"Volatilidad ×2","combinado_tormenta_perfecta":"⚡ Tormenta perfecta",
         }
-        rows = []
+        filas_stress = ""
         for key, esc in escenarios.items():
-            perdida = esc.get("perdida_total_pct") or esc.get("perdida_portafolio_pct", 0) or 0
-            usd     = esc.get("perdida_total_usd") or esc.get("perdida_portafolio_usd", 0) or 0
-            rows.append(ui.tags.tr(
-                ui.tags.td(labels.get(key, key)),
-                ui.tags.td(esc.get("shock_descripcion","—")),
-                ui.tags.td(ui.HTML(f'<span style="color:#f87171;font-weight:600">{float(perdida):.2f}%</span>')),
-                ui.tags.td(fmt_usd(float(usd) if usd else 0)),
-            ))
+            perdida = float(esc.get("perdida_total_pct") or esc.get("perdida_portafolio_pct") or 0)
+            usd     = float(esc.get("perdida_total_usd") or esc.get("perdida_portafolio_usd") or 0)
+            color_p = "#34d399" if perdida > 0 else "#f87171"
+            filas_stress += f"""<tr>
+                <td style="color:#e2e8f0;padding:9px 12px;font-weight:500">{labels.get(key, key)}</td>
+                <td style="color:#94a3b8;padding:9px 12px;font-size:11px">{str(esc.get("shock_descripcion","—"))[:60]}</td>
+                <td style="color:{color_p};font-weight:600;padding:9px 12px">{perdida:.2f}%</td>
+                <td style="color:#e2e8f0;padding:9px 12px">{fmt_usd(usd)}</td>
+            </tr>"""
+        tabla_stress = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#1e293b">
+                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+                         for h in ["Escenario","Shock","Perdida %","Perdida USD"])}
+            </tr></thead>
+            <tbody>{filas_stress}</tbody>
+        </table>"""
         return ui.div(
             ui.tags.p(f"VaR base: {data.get('var_base_pct',0):.3f}% | Portafolio: {fmt_usd(data.get('valor_portafolio_usd'))}", style="color:#94a3b8;font-size:12px;margin-bottom:10px"),
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Escenario","Shock","Pérdida %","Pérdida USD"]])),
-                ui.tags.tbody(*rows),
-            ),
-            ui.tags.p(data.get("interpretacion",""), style="color:#94a3b8;font-size:12px;margin-top:10px"),
+            ui.HTML(tabla_stress),
+            ui.tags.p(str(data.get("interpretacion","")), style="color:#94a3b8;font-size:12px;margin-top:10px"),
         )
 
     # ════════════════════════════════════════════════════
@@ -944,18 +963,27 @@ def server(input, output, session):
         if not fnames:
             fnames = ["rsi_14","macd_hist","ewma_vol","ret_5d","ret_21d","pct_b_bollinger","estocastico_k"]
 
-        rows_f = [ui.tags.tr(ui.tags.td(fn), ui.tags.td(f"{fv:.6f}"))
-                  for fn, fv in zip(fnames, features)]
+        filas_ml = "".join(
+            f'<tr><td style="color:#94a3b8;padding:8px 12px">{fn}</td><td style="color:#60a5fa;padding:8px 12px;font-family:monospace">{fv:.6f}</td></tr>'
+            for fn, fv in zip(fnames, features)
+        )
+        tabla_ml = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#1e293b">
+                <th style="color:#94a3b8;padding:8px 12px;text-align:left;font-size:11px">FEATURE</th>
+                <th style="color:#94a3b8;padding:8px 12px;text-align:left;font-size:11px">VALOR</th>
+            </tr></thead>
+            <tbody>{filas_ml}</tbody>
+        </table>"""
+        # Limpiar emojis del label para evitar encoding issues en Windows
+        label_clean = label.replace("📈","(alcista)").replace("➡️","(lateral)").replace("📉","(bajista)")
         return ui.div(
-            ui.tags.p(label, style=f"color:{color};font-size:36px;font-weight:700;text-align:center;margin:16px 0;font-family:'IBM Plex Mono',monospace"),
+            ui.tags.p(label_clean, style=f"color:{color};font-size:36px;font-weight:700;text-align:center;margin:16px 0"),
             ui.tags.p(f"Activo: {data.get('ticker','—')} | Modelo: {data.get('model_version','—')}",
                       style="color:#94a3b8;font-size:12px;text-align:center"),
             ui.tags.hr(),
             ui.tags.p("Features enviadas al modelo", class_="card-title"),
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(ui.tags.th("Feature"), ui.tags.th("Valor"))),
-                ui.tags.tbody(*rows_f),
-            ),
+            ui.HTML(tabla_ml),
         )
 
     # ════════════════════════════════════════════════════
@@ -973,7 +1001,7 @@ def server(input, output, session):
         if err: return ui.div(ui.tags.p(err, class_="err"))
         if data is None: return ui.tags.p("Presiona Actualizar desde FRED", style="color:#64748b")
         datos = data.get("datos", {})
-        iconos = {"DGS3MO":"📉","DGS10":"📊","CPIAUCSL":"📈","UNRATE":"👷","FEDFUNDS":"🏦","VIXCLS":"⚡"}
+        iconos = {"DGS3MO":"[Rf]","DGS10":"[T10]","CPIAUCSL":"[CPI]","UNRATE":"[U]","FEDFUNDS":"[Fed]","VIXCLS":"[VIX]"}
         cards = []
         for serie, info in datos.items():
             if serie.startswith("_"): continue
@@ -1011,30 +1039,40 @@ def server(input, output, session):
         if err: return ui.div(ui.tags.p(err, class_="err"))
         if data is None: return ui.tags.p("Ingresa tickers y presiona Comparar", style="color:#64748b")
         comp = data.get("comparacion", {})
-        rows = []
+        filas_comp = ""
         for ticker, d in sorted(comp.items(), key=lambda x: x[1].get("sharpe_ratio") or 0, reverse=True):
-            ret    = d.get("retorno_total", 0) or 0
-            sharpe = d.get("sharpe_ratio", 0) or 0
-            rc = "#34d399" if ret>0 else "#f87171"
-            sc = "#34d399" if sharpe>0 else "#f87171"
-            rows.append(ui.tags.tr(
-                ui.tags.td(f"#{d.get('ranking_sharpe',0)} {ticker}"),
-                ui.tags.td(d.get("nombre","")[:22]),
-                ui.tags.td(d.get("pais","—")),
-                ui.tags.td(ui.HTML(f'<span style="color:{rc};font-weight:600">{ret*100:.1f}%</span>')),
-                ui.tags.td(fmt_pct(d.get("volatilidad_anual"))),
-                ui.tags.td(ui.HTML(f'<span style="color:{sc};font-weight:600">{sharpe:.3f}</span>')),
-                ui.tags.td(fmt_pct(d.get("max_drawdown"))),
-                ui.tags.td(d.get("tendencia_ema","—")),
-            ))
+            ret    = float(d.get("retorno_total") or 0)
+            sharpe = float(d.get("sharpe_ratio") or 0)
+            rc = "#34d399" if ret > 0 else "#f87171"
+            sc = "#34d399" if sharpe > 0 else "#f87171"
+            dd = fmt_pct(d.get("max_drawdown"))
+            vol = fmt_pct(d.get("volatilidad_anual"))
+            tendencia = str(d.get("tendencia_ema") or "—")
+            nombre = str(d.get("nombre") or "")[:22]
+            pais = str(d.get("pais") or "—")
+            ranking = int(d.get("ranking_sharpe") or 0)
+            filas_comp += f"""<tr>
+                <td style="color:#e2e8f0;padding:9px 12px;font-weight:500">#{ranking} {ticker}</td>
+                <td style="color:#94a3b8;padding:9px 12px">{nombre}</td>
+                <td style="color:#94a3b8;padding:9px 12px">{pais}</td>
+                <td style="color:{rc};font-weight:600;padding:9px 12px">{ret*100:.1f}%</td>
+                <td style="color:#94a3b8;padding:9px 12px">{vol}</td>
+                <td style="color:{sc};font-weight:600;padding:9px 12px">{sharpe:.3f}</td>
+                <td style="color:#f87171;padding:9px 12px">{dd}</td>
+                <td style="color:#60a5fa;padding:9px 12px;font-size:11px">{tendencia}</td>
+            </tr>"""
+        tabla_comp = f"""
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#1e293b">
+                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+                         for h in ["Ranking","Nombre","Pais","Retorno","Volatilidad","Sharpe","Max DD","Tendencia"])}
+            </tr></thead>
+            <tbody>{filas_comp}</tbody>
+        </table>"""
         return ui.div(
             ui.tags.p(f"Mejor Sharpe: {data.get('mejor_sharpe','—')} | Mayor retorno: {data.get('mejor_retorno','—')} | Menor vol: {data.get('menor_volatilidad','—')}",
                       style="color:#60a5fa;font-size:12px;font-weight:600;margin-bottom:10px"),
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in
-                    ["Ranking","Nombre","País","Retorno","Volatilidad","Sharpe","Max DD","Tendencia"]])),
-                ui.tags.tbody(*rows),
-            ),
+            ui.HTML(tabla_comp),
         )
 
 
