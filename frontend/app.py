@@ -70,7 +70,7 @@ def color_num(v, positive_good=True):
     if v is None: return "—"
     try:
         f = float(v)
-        color = "#34d399" if (f > 0) == positive_good else "#f87171"
+        color = "#2A9D8F" if (f > 0) == positive_good else "#f87171"
         return f'<span style="color:{color};font-weight:600">{f:.4f}</span>'
     except:
         return str(v)
@@ -82,36 +82,69 @@ def color_num(v, positive_good=True):
 
 app_ui = ui.page_fluid(
     ui.tags.head(ui.tags.style("""
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-        body{font-family:'IBM Plex Sans',sans-serif;background:#0f1117;color:#e2e8f0;margin:0}
-        .card{background:#1a1f2e;border:1px solid #2d3748;border-radius:12px;padding:20px;margin-bottom:16px}
-        .card-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:10px}
-        .metric-big{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700;color:#60a5fa}
-        .metric-pos{color:#34d399!important} .metric-neg{color:#f87171!important} .metric-neu{color:#60a5fa!important}
-        .header-bar{background:linear-gradient(135deg,#1e40af,#7c3aed 50%,#db2777);padding:18px 28px;border-radius:12px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
-        .header-title{font-size:22px;font-weight:700;color:white;margin:0}
-        .header-sub{font-size:13px;color:rgba(255,255,255,.75);margin:4px 0 0}
-        .status-ok{background:#064e3b;color:#34d399;padding:4px 14px;border-radius:8px;font-size:12px;font-weight:600}
-        .status-err{background:#450a0a;color:#f87171;padding:4px 14px;border-radius:8px;font-size:12px;font-weight:600}
-        .badge-buy{display:inline-block;background:#064e3b;color:#34d399;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;margin:2px}
-        .badge-sell{display:inline-block;background:#450a0a;color:#f87171;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;margin:2px}
-        .badge-neu{display:inline-block;background:#1e293b;color:#94a3b8;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;margin:2px}
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        :root{
+            --navy:#0F1B33;--navy-mid:#1B2A4A;
+            --teal:#2A9D8F;--teal-bright:#34BFB0;
+            --coral:#E76F51;--coral-soft:#F2856A;
+            --gold:#F4A261;
+            --cream:#F7F3EB;--paper:#FBFAF6;
+            --ink:#0E1326;--ink-soft:#3A4256;
+            --rule:#D3CCBC;--rule-soft:#E8E2D2;
+        }
+        *{box-sizing:border-box}
+        body{font-family:'Inter Tight',sans-serif;background:var(--paper);color:var(--ink);margin:0;line-height:1.55}
+        .card{background:#fff;border:1px solid var(--rule-soft);border-radius:8px;padding:18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(14,19,38,.06)}
+        .card-title{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:var(--coral);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .card-title::before{content:'';display:inline-block;width:18px;height:1px;background:var(--coral)}
+        .metric-big{font-family:'Fraunces',serif;font-size:26px;font-weight:300;color:var(--navy)}
+        .metric-pos{color:var(--teal)!important}
+        .metric-neg{color:var(--coral)!important}
+        .metric-neu{color:var(--gold)!important}
+        .header-bar{background:var(--navy);padding:16px 28px;margin-bottom:0;display:flex;align-items:center;justify-content:space-between}
+        .header-title{font-family:'Fraunces',serif;font-size:20px;font-weight:400;color:var(--paper);margin:0;letter-spacing:-.02em}
+        .header-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(251,250,246,.5);margin:3px 0 0;letter-spacing:.1em;text-transform:uppercase}
+        .status-ok{background:rgba(42,157,143,.12);color:var(--teal);padding:4px 12px;border-radius:100px;font-family:'JetBrains Mono',monospace;font-size:11px;border:1px solid rgba(42,157,143,.3)}
+        .status-err{background:rgba(231,111,81,.1);color:var(--coral);padding:4px 12px;border-radius:100px;font-family:'JetBrains Mono',monospace;font-size:11px;border:1px solid rgba(231,111,81,.25)}
+        .badge-buy{display:inline-block;background:rgba(42,157,143,.1);color:var(--teal);padding:3px 10px;border-radius:100px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;margin:2px;border:1px solid rgba(42,157,143,.2)}
+        .badge-sell{display:inline-block;background:rgba(231,111,81,.1);color:var(--coral);padding:3px 10px;border-radius:100px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;margin:2px;border:1px solid rgba(231,111,81,.2)}
+        .badge-neu{display:inline-block;background:rgba(244,162,97,.1);color:#B8772F;padding:3px 10px;border-radius:100px;font-family:'JetBrains Mono',monospace;font-size:11px;margin:2px;border:1px solid rgba(244,162,97,.2)}
         table{width:100%;border-collapse:collapse;font-size:13px}
-        th{background:#1e293b;color:#94a3b8;text-align:left;padding:9px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
-        td{padding:9px 12px;border-bottom:1px solid #1e293b;font-family:'IBM Plex Mono',monospace}
-        tr:hover td{background:#1e293b55}
-        hr{border:none;border-top:1px solid #2d3748;margin:16px 0}
-        .shiny-input-container label{color:#94a3b8!important;font-size:12px!important;font-weight:500!important;text-transform:uppercase!important;letter-spacing:.04em!important}
-        .form-control,.selectize-input{background:#1a1f2e!important;border:1px solid #2d3748!important;color:#e2e8f0!important;border-radius:8px!important}
-        .btn-primary{background:linear-gradient(135deg,#1e40af,#7c3aed)!important;border:none!important;border-radius:8px!important;font-weight:600!important;width:100%!important;padding:10px!important}
-        .err{color:#f87171;font-size:13px;padding:8px;background:#450a0a22;border-radius:6px;border-left:3px solid #f87171}
+        th{background:var(--cream);color:var(--ink-soft);text-align:left;padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid var(--rule)}
+        td{padding:9px 12px;border-bottom:1px solid var(--rule-soft);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink)}
+        tr:hover td{background:var(--cream)}
+        hr{border:none;border-top:1px solid var(--rule-soft);margin:16px 0}
+        .shiny-input-container label{color:var(--ink-soft)!important;font-family:'JetBrains Mono',monospace!important;font-size:10px!important;font-weight:500!important;text-transform:uppercase!important;letter-spacing:.1em!important}
+        .form-control,.selectize-input{background:#fff!important;border:1px solid var(--rule)!important;color:var(--ink)!important;border-radius:6px!important;font-family:'Inter Tight',sans-serif!important}
+        .form-control:focus,.selectize-input.focus{border-color:var(--teal)!important;box-shadow:0 0 0 3px rgba(42,157,143,.1)!important}
+        .btn-primary{background:var(--navy)!important;border:none!important;border-radius:100px!important;font-family:'Inter Tight',sans-serif!important;font-weight:600!important;color:var(--paper)!important;width:100%!important;padding:10px!important;letter-spacing:.02em!important;transition:all .2s!important;cursor:pointer!important}
+        .btn-primary:hover{background:#1B2A4A!important;transform:translateY(-1px)!important}
+        .err{color:var(--coral);font-size:13px;padding:10px 14px;background:rgba(231,111,81,.08);border-radius:6px;border-left:3px solid var(--coral)}
+        /* Portafolio interactivo */
+        .ticker-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(42,157,143,.08);color:var(--teal);border:1px solid rgba(42,157,143,.2);border-radius:100px;padding:4px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;margin:2px 2px 4px;cursor:default}
+        .ticker-chip .rm{color:rgba(42,157,143,.5);cursor:pointer;font-size:13px;line-height:1;margin-left:2px;transition:color .15s}
+        .ticker-chip .rm:hover{color:var(--coral)}
+        .peso-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--rule-soft)}
+        .peso-row:last-child{border-bottom:none}
+        .peso-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--teal);width:72px;flex-shrink:0;font-weight:500}
+        .peso-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);width:38px;text-align:right;flex-shrink:0}
+        .sum-badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 12px;border-radius:100px;text-align:center;margin-top:8px;width:100%}
+        .sum-ok{background:rgba(42,157,143,.1);color:var(--teal);border:1px solid rgba(42,157,143,.25)}
+        .sum-warn{background:rgba(231,111,81,.1);color:var(--coral);border:1px solid rgba(231,111,81,.25)}
+        /* Nav tabs */
+        .nav-tabs{border-bottom:1px solid var(--rule)!important}
+        .nav-tabs .nav-link{color:var(--ink-soft)!important;border:none!important;padding:10px 16px!important;font-family:'Inter Tight',sans-serif!important;font-size:13px!important;font-weight:500!important;border-radius:0!important;transition:all .2s!important}
+        .nav-tabs .nav-link.active{color:var(--ink)!important;border-bottom:2px solid var(--coral)!important;font-weight:600!important}
+        .nav-tabs .nav-link:hover:not(.active){color:var(--ink)!important;background:var(--cream)!important}
+        .nav-pills .nav-link{color:var(--ink-soft)!important;font-family:'Inter Tight',sans-serif!important;font-size:12px!important;border-radius:100px!important;padding:5px 14px!important}
+        .nav-pills .nav-link.active{background:var(--navy)!important;color:var(--paper)!important}
     """)),
 
     # Header
     ui.div(
         ui.div(
             ui.tags.h1("Risk Analytics", class_="header-title"),
-            ui.tags.p("Proyecto Integrador — Teoría del Riesgo · USTA 2026-I", class_="header-sub"),
+            ui.tags.p("PROYECTO INTEGRADOR — TEORIA DEL RIESGO · USTA 2026-I", class_="header-sub"),
         ),
         ui.output_ui("status_badge"),
         class_="header-bar",
@@ -163,8 +196,8 @@ app_ui = ui.page_fluid(
                 ui.column(3,
                     ui.div(
                         ui.tags.p("Portafolio", class_="card-title"),
-                        ui.input_text("r_tickers", "Tickers (coma)", value=TICKERS_STR),
-                        ui.input_text("r_pesos",   "Pesos (coma)",   value=PESOS_DEFAULT),
+                        ui.output_ui("port_chips_ui"),
+                        ui.output_ui("port_pesos_ui"),
                         ui.input_slider("r_conf", "Confianza VaR", 0.90, 0.99, 0.95, step=0.01),
                         ui.input_select("r_tipo", "Analisis", choices={
                             "var":          "VaR & CVaR + Kupiec",
@@ -232,8 +265,7 @@ app_ui = ui.page_fluid(
                     ui.row(
                         ui.column(4,
                             ui.div(
-                                ui.input_text("st_tickers", "Tickers", value=TICKERS_STR),
-                                ui.input_text("st_pesos",   "Pesos",   value=PESOS_DEFAULT),
+                                ui.output_ui("stress_port_info"),
                                 ui.input_numeric("st_var",   "VaR base (decimal)", 0.0185, min=0.001, step=0.001),
                                 ui.input_numeric("st_sigma", "Volatilidad diaria", 0.012,  min=0.001, step=0.001),
                                 ui.input_numeric("st_valor", "Valor portafolio (USD)", 100000, min=1000),
@@ -270,10 +302,10 @@ app_ui = ui.page_fluid(
                     ui.div(ui.output_ui("ml_out"), class_="card"),
                     ui.div(
                         ui.tags.p("Sobre el modelo", class_="card-title"),
-                        ui.tags.p("Propósito: Clasificación de régimen de mercado (alcista / lateral / bajista).", style="color:#94a3b8;font-size:13px"),
-                        ui.tags.p("Algoritmo: RandomForestClassifier — 200 árboles, max_depth=8, balanced classes.", style="color:#94a3b8;font-size:13px"),
-                        ui.tags.p("Entrenamiento: 80% datos históricos. Partición temporal sin shuffle para evitar data leakage.", style="color:#94a3b8;font-size:13px"),
-                        ui.tags.p("Singleton: el modelo se carga una sola vez al levantar el servidor (verificar en logs de uvicorn).", style="color:#94a3b8;font-size:13px"),
+                        ui.tags.p("Propósito: Clasificación de régimen de mercado (alcista / lateral / bajista).", style="color:#3A4256;font-size:13px"),
+                        ui.tags.p("Algoritmo: RandomForestClassifier — 200 árboles, max_depth=8, balanced classes.", style="color:#3A4256;font-size:13px"),
+                        ui.tags.p("Entrenamiento: 80% datos históricos. Partición temporal sin shuffle para evitar data leakage.", style="color:#3A4256;font-size:13px"),
+                        ui.tags.p("Singleton: el modelo se carga una sola vez al levantar el servidor (verificar en logs de uvicorn).", style="color:#3A4256;font-size:13px"),
                         class_="card",
                     ),
                 ),
@@ -364,7 +396,7 @@ def server(input, output, session):
     def ind_signals():
         data, err = _ind()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Presiona Calcular indicadores", style="color:#64748b;font-size:12px")
+        if data is None: return ui.tags.p("Presiona Calcular indicadores", style="color:#6B7280;font-size:12px")
         señales = data.get("señales", [])
         if not señales: return ui.span("Sin señales activas", class_="badge-neu")
         items = []
@@ -373,7 +405,7 @@ def server(input, output, session):
             items.append(ui.div(
                 ui.span(s.get("tipo",""), class_=cls),
                 ui.tags.span(f" {s.get('indicador','')} — {s.get('descripcion','')[:45]}",
-                             style="font-size:11px;color:#94a3b8;margin-left:4px"),
+                             style="font-size:11px;color:#3A4256;margin-left:4px"),
                 style="margin-bottom:6px",
             ))
         return ui.div(*items)
@@ -383,7 +415,7 @@ def server(input, output, session):
     def ind_metrics():
         data, err = _ind()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Selecciona activo y presiona Calcular", style="color:#64748b")
+        if data is None: return ui.tags.p("Selecciona activo y presiona Calcular", style="color:#6B7280")
         res  = data.get("resumen", {})
         ult  = (data.get("datos") or [{}])[-1]
         rsi  = res.get("rsi_actual")
@@ -392,7 +424,7 @@ def server(input, output, session):
         vs20   = res.get("precio_vs_sma20", "—")
         pct_b  = res.get("boll_pct_b")
 
-        rsi_color = "#f87171" if (rsi or 50)>70 else ("#34d399" if (rsi or 50)<30 else "#60a5fa")
+        rsi_color = "#f87171" if (rsi or 50)>70 else ("#2A9D8F" if (rsi or 50)<30 else "#60a5fa")
 
         def m(title, val, color="#60a5fa"):
             return ui.column(2, ui.div(
@@ -403,10 +435,10 @@ def server(input, output, session):
         return ui.row(
             m("Precio", f"${price:.2f}" if price else "—"),
             m("RSI (14)", f"{rsi:.1f}" if rsi else "—", rsi_color),
-            m("MACD", "Alcista ↑" if macd_p else "Bajista ↓", "#34d399" if macd_p else "#f87171"),
-            m("vs SMA20", vs20.upper(), "#34d399" if vs20=="sobre" else "#f87171"),
+            m("MACD", "Alcista ↑" if macd_p else "Bajista ↓", "#2A9D8F" if macd_p else "#E76F51"),
+            m("vs SMA20", vs20.upper(), "#2A9D8F" if vs20=="sobre" else "#E76F51"),
             m("Bollinger %B", f"{pct_b:.2f}" if pct_b else "—",
-              "#f87171" if (pct_b or 0)>0.8 else ("#34d399" if (pct_b or 0)<0.2 else "#60a5fa")),
+              "#f87171" if (pct_b or 0)>0.8 else ("#2A9D8F" if (pct_b or 0)<0.2 else "#60a5fa")),
             m("Días datos", data.get("total_dias","—"), "#94a3b8"),
         )
 
@@ -418,78 +450,78 @@ def server(input, output, session):
     def ind_chart():
         data, err = _ind()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Sin datos", style="color:#64748b")
+        if data is None: return ui.tags.p("Sin datos", style="color:#6B7280")
         try:
             import plotly.graph_objects as go
             import plotly.io as pio
             df = pd.DataFrame(data.get("datos", [])).dropna(subset=["cierre"])
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=df["fecha"], y=df["cierre"], name="Precio",
-                                     line=dict(color="#60a5fa", width=2)))
+                                     line=dict(color="#2A9D8F", width=2)))
             for col, color, name in [("sma_20","#f59e0b","SMA 20"),("sma_50","#a78bfa","SMA 50"),
-                                      ("boll_superior","#475569","BB Sup"),("boll_inferior","#475569","BB Inf")]:
+                                      ("boll_superior","#3A4256","BB Sup"),("boll_inferior","#3A4256","BB Inf")]:
                 if col in df.columns:
                     fig.add_trace(go.Scatter(x=df["fecha"], y=df[col], name=name,
                                              line=dict(color=color, width=1,
                                                        dash="dot" if "boll" in col else "solid")))
-            fig.update_layout(height=280, paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
-                              font=dict(color="#94a3b8", size=11), margin=dict(t=20,b=20,l=40,r=10),
-                              legend=dict(orientation="h", y=1.05, bgcolor="rgba(0,0,0,0)"))
-            fig.update_xaxes(gridcolor="#2d3748")
-            fig.update_yaxes(gridcolor="#2d3748")
+            fig.update_layout(height=280, paper_bgcolor="#FBFAF6", plot_bgcolor="#FFFFFF",
+                              font=dict(color="#3A4256", size=11), margin=dict(t=20,b=20,l=40,r=10),
+                              legend=dict(orientation="h", y=1.05, bgcolor="rgba(255,255,255,0)"))
+            fig.update_xaxes(gridcolor="#E8E2D2")
+            fig.update_yaxes(gridcolor="#E8E2D2")
             return ui.HTML(pio.to_html(fig, include_plotlyjs="cdn", full_html=False))
         except Exception as e:
-            return ui.tags.p(str(e), style="color:#f87171;font-size:12px")
+            return ui.tags.p(str(e), style="color:#E76F51;font-size:12px")
 
     @output
     @render.ui
     def ind_rsi():
         data, err = _ind()
-        if err or data is None: return ui.tags.p(err or "Sin datos", style="color:#64748b;font-size:12px")
+        if err or data is None: return ui.tags.p(err or "Sin datos", style="color:#6B7280;font-size:12px")
         try:
             import plotly.graph_objects as go
             import plotly.io as pio
             df = pd.DataFrame(data.get("datos",[])).dropna(subset=["rsi_14"])
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df["fecha"], y=df["rsi_14"], line=dict(color="#a78bfa", width=1.5)))
-            fig.add_hline(y=70, line_dash="dash", line_color="#f87171", annotation_text="70")
-            fig.add_hline(y=30, line_dash="dash", line_color="#34d399", annotation_text="30")
-            fig.update_layout(height=180, paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
-                              font=dict(color="#94a3b8",size=10), showlegend=False,
+            fig.add_trace(go.Scatter(x=df["fecha"], y=df["rsi_14"], line=dict(color="#7C3AED", width=1.5)))
+            fig.add_hline(y=70, line_dash="dash", line_color="#E76F51", annotation_text="70")
+            fig.add_hline(y=30, line_dash="dash", line_color="#2A9D8F", annotation_text="30")
+            fig.update_layout(height=180, paper_bgcolor="#FBFAF6", plot_bgcolor="#FFFFFF",
+                              font=dict(color="#3A4256",size=10), showlegend=False,
                               margin=dict(t=10,b=20,l=40,r=10), yaxis=dict(range=[0,100]))
-            fig.update_xaxes(gridcolor="#2d3748"); fig.update_yaxes(gridcolor="#2d3748")
+            fig.update_xaxes(gridcolor="#E8E2D2"); fig.update_yaxes(gridcolor="#E8E2D2")
             return ui.HTML(pio.to_html(fig, include_plotlyjs=False, full_html=False))
         except Exception as e:
-            return ui.tags.p(str(e), style="color:#f87171;font-size:11px")
+            return ui.tags.p(str(e), style="color:#E76F51;font-size:11px")
 
     @output
     @render.ui
     def ind_macd():
         data, err = _ind()
-        if err or data is None: return ui.tags.p(err or "Sin datos", style="color:#64748b;font-size:12px")
+        if err or data is None: return ui.tags.p(err or "Sin datos", style="color:#6B7280;font-size:12px")
         try:
             import plotly.graph_objects as go
             import plotly.io as pio
             df = pd.DataFrame(data.get("datos",[])).dropna(subset=["macd"])
-            colors = ["#34d399" if v>=0 else "#f87171" for v in df["macd_hist"].fillna(0)]
+            colors = ["#2A9D8F" if v>=0 else "#f87171" for v in df["macd_hist"].fillna(0)]
             fig = go.Figure()
             fig.add_trace(go.Bar(x=df["fecha"], y=df["macd_hist"], name="Hist.", marker_color=colors))
             fig.add_trace(go.Scatter(x=df["fecha"], y=df["macd"],       name="MACD",  line=dict(color="#60a5fa",width=1.5)))
-            fig.add_trace(go.Scatter(x=df["fecha"], y=df["macd_señal"], name="Señal", line=dict(color="#f59e0b",width=1.5)))
-            fig.update_layout(height=180, paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
-                              font=dict(color="#94a3b8",size=10),
-                              legend=dict(orientation="h",bgcolor="rgba(0,0,0,0)",font=dict(size=10)),
+            fig.add_trace(go.Scatter(x=df["fecha"], y=df["macd_señal"], name="Señal", line=dict(color="#F4A261",width=1.5)))
+            fig.update_layout(height=180, paper_bgcolor="#FBFAF6", plot_bgcolor="#FFFFFF",
+                              font=dict(color="#3A4256",size=10),
+                              legend=dict(orientation="h",bgcolor="rgba(255,255,255,0)",font=dict(size=10)),
                               margin=dict(t=10,b=20,l=40,r=10))
-            fig.update_xaxes(gridcolor="#2d3748"); fig.update_yaxes(gridcolor="#2d3748")
+            fig.update_xaxes(gridcolor="#E8E2D2"); fig.update_yaxes(gridcolor="#E8E2D2")
             return ui.HTML(pio.to_html(fig, include_plotlyjs=False, full_html=False))
         except Exception as e:
-            return ui.tags.p(str(e), style="color:#f87171;font-size:11px")
+            return ui.tags.p(str(e), style="color:#E76F51;font-size:11px")
 
     @output
     @render.ui
     def ind_hist_rend():
         data, err = _ind()
-        if err or data is None: return ui.tags.p(err or "Sin datos", style="color:#64748b;font-size:12px")
+        if err or data is None: return ui.tags.p(err or "Sin datos", style="color:#6B7280;font-size:12px")
         try:
             import plotly.graph_objects as go
             import plotly.io as pio
@@ -498,7 +530,7 @@ def server(input, output, session):
 
             df = pd.DataFrame(data.get("datos", [])).dropna(subset=["cierre"])
             if len(df) < 10:
-                return ui.tags.p("Insuficientes datos para histograma", style="color:#64748b;font-size:11px")
+                return ui.tags.p("Insuficientes datos para histograma", style="color:#6B7280;font-size:11px")
 
             precios = df["cierre"].astype(float)
             rend_log = np.log(precios / precios.shift(1)).dropna()
@@ -522,15 +554,15 @@ def server(input, output, session):
             fig.add_trace(go.Scatter(
                 x=x_range, y=y_norm,
                 mode="lines", name=f"Normal(mu={mu:.4f}, sig={sig:.4f})",
-                line=dict(color="#E76F51", width=2),
+                line=dict(color="#E76F51", width=2.5),
             ))
             # Líneas VaR 95% y 99%
             var95 = mu + stats.norm.ppf(0.05) * sig
             var99 = mu + stats.norm.ppf(0.01) * sig
-            fig.add_vline(x=var95, line_color="#F4A261", line_dash="dash",
+            fig.add_vline(x=var95, line_color="#B8772F", line_dash="dash",
                           annotation_text="VaR 95%", annotation_font_color="#F4A261")
-            fig.add_vline(x=var99, line_color="#f87171", line_dash="dash",
-                          annotation_text="VaR 99%", annotation_font_color="#f87171")
+            fig.add_vline(x=var99, line_color="#E76F51", line_dash="dash",
+                          annotation_text="VaR 99%", annotation_font_color="#E76F51")
 
             # Estadísticas en anotación
             kurt = float(rend_log.kurtosis())
@@ -540,38 +572,152 @@ def server(input, output, session):
                 text=f"Kurt: {kurt:.2f} | Skew: {skew:.2f}<br>Media: {mu*100:.4f}% | Vol: {sig*100:.4f}%",
                 showarrow=False, align="left",
                 font=dict(size=10, color="#94a3b8"),
-                bgcolor="#1e293b", bordercolor="#334155", borderwidth=1,
+                bgcolor="#F7F3EB", bordercolor="#D3CCBC", borderwidth=1,
             )
             fig.update_layout(
                 height=260,
-                paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
-                font=dict(color="#94a3b8", size=11),
-                legend=dict(orientation="h", y=-0.2, bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+                paper_bgcolor="#FBFAF6", plot_bgcolor="#FFFFFF",
+                font=dict(color="#3A4256", size=11),
+                legend=dict(orientation="h", y=-0.2, bgcolor="rgba(255,255,255,0)", font=dict(size=10)),
                 margin=dict(t=20, b=60, l=50, r=10),
                 xaxis_title="Rendimiento logaritmico diario",
                 yaxis_title="Densidad",
                 bargap=0.02,
             )
-            fig.update_xaxes(gridcolor="#2d3748")
-            fig.update_yaxes(gridcolor="#2d3748")
+            fig.update_xaxes(gridcolor="#E8E2D2")
+            fig.update_yaxes(gridcolor="#E8E2D2")
             return ui.HTML(pio.to_html(fig, include_plotlyjs=False, full_html=False))
         except Exception as e:
-            return ui.tags.p(str(e), style="color:#f87171;font-size:11px")
+            return ui.tags.p(str(e), style="color:#E76F51;font-size:11px")
 
     # ════════════════════════════════════════════════════
     # TAB 2 — RIESGO
     # ════════════════════════════════════════════════════
 
+    # ── Estado reactivo del portafolio ──────────────────────────────────────────
+    _port_rv = reactive.Value({
+        t: round(1/len(TICKERS_DEFAULT), 4) for t in TICKERS_DEFAULT
+    })
+
+    @output
+    @render.ui
+    def port_chips_ui():
+        port = _port_rv.get()
+        tickers = list(port.keys())
+        # Solo activos del catálogo que no están ya en el portafolio
+        catalogo = ["AAPL","MSFT","JPM","XOM","JNJ","SAP.DE","NOVN.SW","EC","CIB","TM",
+                    "GOOGL","AMZN","TSLA","BAC","GS","CVX","PFE","WMT","F"]
+        disponibles = {"": "— Agregar activo —"}
+        disponibles.update({t: t for t in catalogo if t not in tickers})
+
+        chips = [
+            ui.tags.span(
+                t,
+                ui.tags.span(
+                    " ×",
+                    onclick=f"Shiny.setInputValue('_rm_ticker','{t}',{{priority:'event'}})",
+                    class_="rm",
+                ),
+                class_="ticker-chip",
+            )
+            for t in tickers
+        ]
+        return ui.div(
+            ui.tags.p("ACTIVOS EN EL PORTAFOLIO", style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:6px"),
+            ui.div(*chips, style="margin-bottom:10px"),
+            ui.input_select("_add_ticker", None, choices=disponibles, width="100%"),
+            style="margin-bottom:12px",
+        )
+
+    @output
+    @render.ui
+    def port_pesos_ui():
+        port  = _port_rv.get()
+        total = sum(port.values())
+        ok    = abs(total - 1.0) <= 0.005
+        rows  = []
+        for t, w in port.items():
+            tid = t.replace(".","_").replace("-","_")
+            rows.append(ui.div(
+                ui.tags.span(t, class_="peso-label"),
+                ui.input_slider(f"_w_{tid}", None, 0.0, 1.0, w, step=0.01, width="100%"),
+                ui.tags.span(f"{w:.2f}", class_="peso-num", id=f"_wv_{tid}"),
+                class_="peso-row",
+            ))
+        badge_cls = "sum-badge sum-ok" if ok else "sum-badge sum-warn"
+        badge_txt = f"Suma: {total:.3f} ✓" if ok else f"Suma: {total:.3f} — debe ser 1.0"
+        return ui.div(
+            ui.tags.p("PESOS (deben sumar 1.0)", style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:6px"),
+            *rows,
+            ui.tags.span(badge_txt, class_=badge_cls),
+            ui.input_action_button("_norm_btn", "Normalizar pesos", class_="btn-primary",
+                                   style="margin-top:6px;font-size:11px;padding:6px!important"),
+            style="margin-bottom:12px",
+        )
+
+    # Agregar ticker
+    @reactive.effect
+    @reactive.event(input._add_ticker)
+    def _on_add():
+        val = input._add_ticker()
+        if not val or val == "": return
+        port = dict(_port_rv.get())
+        if val in port: return
+        port[val] = round(1 / (len(port) + 1), 4)
+        # Renormalizar
+        total = sum(port.values())
+        port = {k: round(v/total, 4) for k, v in port.items()}
+        _port_rv.set(port)
+
+    # Quitar ticker
+    @reactive.effect
+    @reactive.event(input._rm_ticker)
+    def _on_remove():
+        val = input._rm_ticker()
+        if not val: return
+        port = {k: v for k, v in _port_rv.get().items() if k != val}
+        if len(port) < 2: return
+        total = sum(port.values()) or 1
+        port = {k: round(v/total, 4) for k, v in port.items()}
+        _port_rv.set(port)
+
+    # Normalizar pesos
+    @reactive.effect
+    @reactive.event(input._norm_btn)
+    def _on_norm():
+        port   = dict(_port_rv.get())
+        tickers = list(port.keys())
+        nuevos = {}
+        for t in tickers:
+            tid = t.replace(".","_").replace("-","_")
+            try:
+                w = float(getattr(input, f"_w_{tid}")())
+            except Exception:
+                w = port[t]
+            nuevos[t] = max(0.0, w)
+        total = sum(nuevos.values()) or 1
+        nuevos = {k: round(v/total, 4) for k, v in nuevos.items()}
+        _port_rv.set(nuevos)
+
     @reactive.calc
     @reactive.event(input.r_btn)
     def _riesgo():
-        try:
-            tickers = [t.strip().upper() for t in input.r_tickers().split(",") if t.strip()]
-            pesos   = [float(p.strip()) for p in input.r_pesos().split(",") if p.strip()]
-        except ValueError:
-            return "error", "Pesos deben ser números separados por coma"
-        tipo    = input.r_tipo()
-        conf    = input.r_conf()
+        port    = dict(_port_rv.get())
+        tickers = list(port.keys())
+        # Leer sliders actuales
+        pesos = []
+        for t in tickers:
+            tid = t.replace(".","_").replace("-","_")
+            try:
+                w = float(getattr(input, f"_w_{tid}")())
+            except Exception:
+                w = port[t]
+            pesos.append(max(0.0, w))
+        # Normalizar silenciosamente
+        total = sum(pesos) or 1
+        pesos = [round(p/total, 4) for p in pesos]
+        tipo  = input.r_tipo()
+        conf  = input.r_conf()
         payload = {"tickers": tickers, "pesos": pesos, "nivel_confianza": conf}
         return tipo, tickers, pesos, payload
 
@@ -581,7 +727,7 @@ def server(input, output, session):
         result = _riesgo()
         if result is None or result[0] == "error":
             msg = result[1] if result else "Configura el portafolio y presiona Calcular"
-            return ui.tags.p(msg, style="color:#64748b" if result is None else "color:#f87171")
+            return ui.tags.p(msg, style="color:#6B7280" if result is None else "color:#E76F51")
 
         tipo, tickers, pesos, payload = result
 
@@ -601,10 +747,10 @@ def server(input, output, session):
             data, err = api_get(f"/volatilidad/{tickers[0]}", {"lambda_ewma": 0.94})
             if err: return ui.div(ui.tags.p(err, class_="err"))
             return _render_garch(data)
-        return ui.tags.p("Selecciona un análisis", style="color:#64748b")
+        return ui.tags.p("Selecciona un análisis", style="color:#6B7280")
 
     def _render_var(data):
-        if not data: return ui.tags.p("Sin datos", style="color:#64748b")
+        if not data: return ui.tags.p("Sin datos", style="color:#6B7280")
         vp  = data.get("var_parametrico", {})
         vh  = data.get("var_historico",   {})
         vmc = data.get("var_montecarlo",  {})
@@ -616,21 +762,21 @@ def server(input, output, session):
             badge = "Pasa" if adec else ("Falla" if adec is not None else "—")
             lr   = kup.get("LR_POF", "—")
             lr_s = f"{lr:.4f}" if isinstance(lr, float) else str(lr)
-            color = "#34d399" if adec else "#f87171"
+            color = "#2A9D8F" if adec else "#f87171"
             return f"""<tr>
-                <td style="color:#e2e8f0">{label}</td>
-                <td style="color:#60a5fa">{d.get("var_porcentaje") or "—"}</td>
-                <td style="color:#e2e8f0">{fmt_usd(d.get("var_monetario_usd"))}</td>
-                <td style="color:#a78bfa">{d.get("cvar_porcentaje") or "—"}</td>
-                <td style="color:#e2e8f0">{fmt_usd(d.get("cvar_monetario_usd"))}</td>
+                <td style="color:#0E1326">{label}</td>
+                <td style="color:#0F1B33">{d.get("var_porcentaje") or "—"}</td>
+                <td style="color:#0E1326">{fmt_usd(d.get("var_monetario_usd"))}</td>
+                <td style="color:#F4A261">{d.get("cvar_porcentaje") or "—"}</td>
+                <td style="color:#0E1326">{fmt_usd(d.get("cvar_monetario_usd"))}</td>
                 <td style="color:{color};font-weight:600">{badge}</td>
-                <td style="color:#94a3b8">{lr_s}</td>
+                <td style="color:#3A4256">{lr_s}</td>
             </tr>"""
 
         tabla_html = f"""
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr style="background:#1e293b">
-                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+            <thead><tr style="background:#F7F3EB">
+                {"".join(f'<th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
                          for h in ["Metodo","VaR %","VaR USD","CVaR %","CVaR USD","Kupiec","LR_POF"])}
             </tr></thead>
             <tbody>
@@ -645,17 +791,17 @@ def server(input, output, session):
             ui.HTML(tabla_html),
             ui.tags.hr(),
             ui.tags.p("Backtesting de Kupiec (LR_POF — umbral 3.841)", class_="card-title"),
-            ui.tags.p(str(rk.get("recomendacion","—")), style="color:#60a5fa;font-size:13px"),
-            ui.tags.p(str(data.get("interpretacion_general","—")), style="color:#94a3b8;font-size:12px;margin-top:8px"),
+            ui.tags.p(str(rk.get("recomendacion","—")), style="color:#0F1B33;font-size:13px"),
+            ui.tags.p(str(data.get("interpretacion_general","—")), style="color:#3A4256;font-size:12px;margin-top:8px"),
         )
 
 
     def _render_capm(data):
         if not data or "activos" not in data:
-            return ui.tags.p("Sin datos CAPM", style="color:#64748b")
+            return ui.tags.p("Sin datos CAPM", style="color:#6B7280")
         activos = data.get("activos", {})
         if not activos:
-            return ui.tags.p("Sin activos calculados (datos insuficientes)", style="color:#f87171")
+            return ui.tags.p("Sin activos calculados (datos insuficientes)", style="color:#E76F51")
 
         filas = ""
         for t, d in activos.items():
@@ -664,20 +810,20 @@ def server(input, output, session):
             alpha = fmt_pct(d.get("alpha_anual"))
             r2    = f"{float(d.get('r_cuadrado') or 0):.4f}"
             tipo  = str(d.get("interpretacion_beta",""))[:45]
-            bc    = "#f87171" if beta>1.2 else ("#34d399" if beta<0.8 else "#f59e0b")
+            bc    = "#f87171" if beta>1.2 else ("#2A9D8F" if beta<0.8 else "#f59e0b")
             filas += f"""<tr>
-                <td style="color:#e2e8f0;padding:9px 12px">{t}</td>
+                <td style="color:#0E1326;padding:9px 12px">{t}</td>
                 <td style="color:{bc};font-weight:600;padding:9px 12px">{beta:.4f}</td>
-                <td style="color:#60a5fa;padding:9px 12px">{er}</td>
-                <td style="color:#a78bfa;padding:9px 12px">{alpha}</td>
-                <td style="color:#94a3b8;padding:9px 12px">{r2}</td>
-                <td style="color:#94a3b8;padding:9px 12px;font-size:11px">{tipo}</td>
+                <td style="color:#0F1B33;padding:9px 12px">{er}</td>
+                <td style="color:#F4A261;padding:9px 12px">{alpha}</td>
+                <td style="color:#3A4256;padding:9px 12px">{r2}</td>
+                <td style="color:#3A4256;padding:9px 12px;font-size:11px">{tipo}</td>
             </tr>"""
 
         tabla_html = f"""
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr style="background:#1e293b">
-                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+            <thead><tr style="background:#F7F3EB">
+                {"".join(f'<th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
                          for h in ["Ticker","Beta","E(R) CAPM","Alpha Jensen","R2","Tipo"])}
             </tr></thead>
             <tbody>{filas}</tbody>
@@ -719,81 +865,81 @@ def server(input, output, session):
             fig_capm.add_trace(go.Scatter(
                 x=b_range, y=sml_y,
                 mode="lines", name="SML",
-                line=dict(color="#475569", width=1.5, dash="dot"),
+                line=dict(color="#3A4256", width=1.5, dash="dot"),
                 showlegend=True
             ))
-            fig_capm.add_vline(x=0, line_color="#334155", line_width=1)
-            fig_capm.add_hline(y=rf_val, line_color="#334155", line_width=1,
-                               annotation_text=f"Rf={rf_val:.2f}%", annotation_font_color="#64748b")
+            fig_capm.add_vline(x=0, line_color="#D3CCBC", line_width=1)
+            fig_capm.add_hline(y=rf_val, line_color="#D3CCBC", line_width=1,
+                               annotation_text=f"Rf={rf_val:.2f}%", annotation_font_color="#6B7280")
             fig_capm.update_layout(
                 height=320,
-                paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
-                font=dict(color="#94a3b8", size=11),
+                paper_bgcolor="#FBFAF6", plot_bgcolor="#FFFFFF",
+                font=dict(color="#3A4256", size=11),
                 xaxis_title="Beta (riesgo sistematico)",
                 yaxis_title="E(R) CAPM (%)",
-                legend=dict(orientation="h", y=-0.2, bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+                legend=dict(orientation="h", y=-0.2, bgcolor="rgba(255,255,255,0)", font=dict(size=10)),
                 margin=dict(t=20, b=60, l=50, r=10),
                 showlegend=True,
             )
-            fig_capm.update_xaxes(gridcolor="#2d3748")
-            fig_capm.update_yaxes(gridcolor="#2d3748")
+            fig_capm.update_xaxes(gridcolor="#E8E2D2")
+            fig_capm.update_yaxes(gridcolor="#E8E2D2")
             capm_chart_html = pio.to_html(fig_capm, include_plotlyjs=False, full_html=False)
         except Exception as e:
             capm_chart_html = f"<p style='color:#f87171;font-size:11px'>Error grafico: {e}</p>"
 
         return ui.div(
             ui.tags.p(f"Benchmark: {data.get('benchmark','SPY')} | Rf: {rf} | Prima mercado: {prima}",
-                      style="color:#94a3b8;font-size:12px;margin-bottom:10px"),
+                      style="color:#3A4256;font-size:12px;margin-bottom:10px"),
             ui.HTML(tabla_html),
             ui.tags.hr(style="margin:16px 0"),
             ui.tags.p("Security Market Line (SML) — Beta vs E(R) CAPM", class_="card-title"),
-            ui.tags.p("Tamano del punto = volatilidad anual del activo", style="color:#64748b;font-size:11px;margin-bottom:6px"),
+            ui.tags.p("Tamano del punto = volatilidad anual del activo", style="color:#6B7280;font-size:11px;margin-bottom:6px"),
             ui.HTML(capm_chart_html),
         )
 
 
     def _render_markowitz(data):
-        if not data: return ui.tags.p("Sin datos", style="color:#64748b")
+        if not data: return ui.tags.p("Sin datos", style="color:#6B7280")
         ms = data.get("portafolio_max_sharpe", {})
         mv = data.get("portafolio_min_varianza", {})
 
         def tabla_pesos(port):
             pesos = port.get("pesos", {})
             if not pesos:
-                return "<tr><td style='color:#94a3b8;padding:8px'>Sin datos</td></tr>"
+                return "<tr><td style='color:#3A4256;padding:8px'>Sin datos</td></tr>"
             return "".join(
-                f"<tr><td style='color:#e2e8f0;padding:7px 12px'>{t}</td>"
+                f"<tr><td style='color:#0E1326;padding:7px 12px'>{t}</td>"
                 f"<td style='color:#60a5fa;padding:7px 12px;font-weight:600'>{float(v)*100:.1f}%</td></tr>"
                 for t, v in pesos.items()
             )
 
         def color_ret(port):
-            return "#34d399" if (port.get("retorno_anual") or 0) > 0 else "#f87171"
+            return "#2A9D8F" if (port.get("retorno_anual") or 0) > 0 else "#f87171"
 
         html = f"""
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
             <div>
-                <p style="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:6px">Maximo Sharpe</p>
+                <p style="color:#3A4256;font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:6px">Maximo Sharpe</p>
                 <p style="color:{color_ret(ms)};font-size:12px;margin-bottom:8px">
                     Retorno: {fmt_pct(ms.get("retorno_anual"))} | Vol: {fmt_pct(ms.get("volatilidad_anual"))} | Sharpe: {ms.get("sharpe_ratio") or 0:.3f}
                 </p>
                 <table style="width:100%;border-collapse:collapse;font-size:13px">
-                    <thead><tr style="background:#1e293b">
-                        <th style="color:#94a3b8;padding:7px 12px;text-align:left;font-size:11px">Ticker</th>
-                        <th style="color:#94a3b8;padding:7px 12px;text-align:left;font-size:11px">Peso</th>
+                    <thead><tr style="background:#F7F3EB">
+                        <th style="color:#3A4256;padding:7px 12px;text-align:left;font-size:11px">Ticker</th>
+                        <th style="color:#3A4256;padding:7px 12px;text-align:left;font-size:11px">Peso</th>
                     </tr></thead>
                     <tbody>{tabla_pesos(ms)}</tbody>
                 </table>
             </div>
             <div>
-                <p style="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:6px">Minima Varianza</p>
+                <p style="color:#3A4256;font-size:11px;font-weight:600;text-transform:uppercase;margin-bottom:6px">Minima Varianza</p>
                 <p style="color:{color_ret(mv)};font-size:12px;margin-bottom:8px">
                     Retorno: {fmt_pct(mv.get("retorno_anual"))} | Vol: {fmt_pct(mv.get("volatilidad_anual"))} | Sharpe: {mv.get("sharpe_ratio") or 0:.3f}
                 </p>
                 <table style="width:100%;border-collapse:collapse;font-size:13px">
-                    <thead><tr style="background:#1e293b">
-                        <th style="color:#94a3b8;padding:7px 12px;text-align:left;font-size:11px">Ticker</th>
-                        <th style="color:#94a3b8;padding:7px 12px;text-align:left;font-size:11px">Peso</th>
+                    <thead><tr style="background:#F7F3EB">
+                        <th style="color:#3A4256;padding:7px 12px;text-align:left;font-size:11px">Ticker</th>
+                        <th style="color:#3A4256;padding:7px 12px;text-align:left;font-size:11px">Peso</th>
                     </tr></thead>
                     <tbody>{tabla_pesos(mv)}</tbody>
                 </table>
@@ -830,7 +976,7 @@ def server(input, output, session):
                     x=[v*100 for v in vols_sim[:n]],
                     y=[r*100 for r in rets_sim[:n]],
                     mode="markers",
-                    marker=dict(size=3, color=colors_sim, colorscale="Viridis",
+                    marker=dict(size=3, color=colors_sim, colorscale=[[0,"#E8E2D2"],[0.5,"#2A9D8F"],[1,"#0F1B33"]],
                                 showscale=True, colorbar=dict(title="Sharpe", x=0.52, len=0.8)),
                     name="Portafolios simulados",
                     hovertemplate="Vol: %{x:.1f}%<br>Ret: %{y:.1f}%<extra></extra>",
@@ -898,13 +1044,13 @@ def server(input, output, session):
 
             fig_m.update_layout(
                 height=360,
-                paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
-                font=dict(color="#94a3b8", size=10),
-                legend=dict(orientation="h", y=-0.18, bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+                paper_bgcolor="#FBFAF6", plot_bgcolor="#FFFFFF",
+                font=dict(color="#3A4256", size=10),
+                legend=dict(orientation="h", y=-0.18, bgcolor="rgba(255,255,255,0)", font=dict(size=10)),
                 margin=dict(t=40, b=60, l=50, r=60),
             )
-            fig_m.update_xaxes(gridcolor="#2d3748")
-            fig_m.update_yaxes(gridcolor="#2d3748")
+            fig_m.update_xaxes(gridcolor="#E8E2D2")
+            fig_m.update_yaxes(gridcolor="#E8E2D2")
             mko_html = pio.to_html(fig_m, include_plotlyjs=False, full_html=False)
         except Exception as e:
             mko_html = f"<p style='color:#f87171;font-size:11px'>Error grafico: {e}</p>"
@@ -919,7 +1065,7 @@ def server(input, output, session):
 
 
     def _render_garch(data):
-        if not data: return ui.tags.p("Sin datos GARCH", style="color:#64748b")
+        if not data: return ui.tags.p("Sin datos GARCH", style="color:#6B7280")
         garch   = data.get("garch", {})
         modelos = garch.get("modelos", [])
         mejor   = garch.get("mejor_por_aic","—")
@@ -930,21 +1076,21 @@ def server(input, output, session):
         for m in modelos:
             star = "* " if m.get("modelo") == mejor else ""
             if "error" in m:
-                filas += f"<tr><td style='color:#e2e8f0;padding:9px 12px'>{star}{m['modelo']}</td><td colspan='5' style='color:#f87171;padding:9px 12px'>Error: {str(m['error'])[:60]}</td></tr>"
+                filas += f"<tr><td style='color:#0E1326;padding:9px 12px'>{star}{m['modelo']}</td><td colspan='5' style='color:#f87171;padding:9px 12px'>Error: {str(m['error'])[:60]}</td></tr>"
             else:
                 filas += f"""<tr>
-                    <td style="color:#e2e8f0;padding:9px 12px;font-weight:{'600' if star else '400'}">{star}{m['modelo']}</td>
-                    <td style="color:#60a5fa;padding:9px 12px">{float(m.get('aic') or 0):.2f}</td>
-                    <td style="color:#94a3b8;padding:9px 12px">{float(m.get('bic') or 0):.2f}</td>
-                    <td style="color:#a78bfa;padding:9px 12px">{float(m.get('alpha') or 0):.4f}</td>
-                    <td style="color:#94a3b8;padding:9px 12px">{float(m.get('beta') or 0):.4f}</td>
-                    <td style="color:#34d399;padding:9px 12px">{fmt_pct(m.get('vol_pronostico_anual'))}</td>
+                    <td style="color:#0E1326;padding:9px 12px;font-weight:{'600' if star else '400'}">{star}{m['modelo']}</td>
+                    <td style="color:#0F1B33;padding:9px 12px">{float(m.get('aic') or 0):.2f}</td>
+                    <td style="color:#3A4256;padding:9px 12px">{float(m.get('bic') or 0):.2f}</td>
+                    <td style="color:#F4A261;padding:9px 12px">{float(m.get('alpha') or 0):.4f}</td>
+                    <td style="color:#3A4256;padding:9px 12px">{float(m.get('beta') or 0):.4f}</td>
+                    <td style="color:#2A9D8F;padding:9px 12px">{fmt_pct(m.get('vol_pronostico_anual'))}</td>
                 </tr>"""
 
         tabla_html = f"""
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr style="background:#1e293b">
-                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+            <thead><tr style="background:#F7F3EB">
+                {"".join(f'<th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
                          for h in ["Modelo","AIC","BIC","Alpha","Beta","Vol. Pronostico"])}
             </tr></thead>
             <tbody>{filas}</tbody>
@@ -953,11 +1099,11 @@ def server(input, output, session):
         vol_anual = fmt_pct(ewma94.get("vol_ultimo_anual"))
         return ui.div(
             ui.tags.p(f"EWMA lambda=0.94 — Volatilidad anualizada: {vol_anual}",
-                      style="color:#34d399;font-weight:600;margin-bottom:12px"),
+                      style="color:#2A9D8F;font-weight:600;margin-bottom:12px"),
             ui.tags.p("ARCH/GARCH — Tabla comparativa AIC/BIC", class_="card-title"),
             ui.HTML(tabla_html),
             ui.tags.p(str(garch.get("interpretacion","—")),
-                      style="color:#60a5fa;font-size:12px;margin-top:10px"),
+                      style="color:#0F1B33;font-size:12px;margin-top:10px"),
         )
 
 
@@ -973,14 +1119,14 @@ def server(input, output, session):
     def rf_params():
         data, err = _rf()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Presiona el botón", style="color:#64748b;font-size:12px")
+        if data is None: return ui.tags.p("Presiona el botón", style="color:#6B7280;font-size:12px")
         params = data.get("parametros", {})
         interp = data.get("interpretacion_parametros", {})
         return ui.div(
-            ui.tags.p(f"RMSE: {data.get('rmse_ajuste_pct','—'):.4f}%", style="color:#34d399;font-weight:600"),
-            ui.tags.p(f"Forma: {data.get('forma_curva','—')}", style="color:#f59e0b;font-size:12px"),
+            ui.tags.p(f"RMSE: {data.get('rmse_ajuste_pct','—'):.4f}%", style="color:#2A9D8F;font-weight:600"),
+            ui.tags.p(f"Forma: {data.get('forma_curva','—')}", style="color:#B8772F;font-size:12px"),
             ui.tags.hr(),
-            *[ui.tags.p(v, style="color:#94a3b8;font-size:11px;margin-bottom:4px") for v in interp.values()],
+            *[ui.tags.p(v, style="color:#3A4256;font-size:11px;margin-bottom:4px") for v in interp.values()],
         )
 
     @output
@@ -988,7 +1134,7 @@ def server(input, output, session):
     def rf_chart():
         data, err = _rf()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Presiona Cargar curva FRED", style="color:#64748b")
+        if data is None: return ui.tags.p("Presiona Cargar curva FRED", style="color:#6B7280")
         try:
             import plotly.graph_objects as go
             import plotly.io as pio
@@ -1002,15 +1148,15 @@ def server(input, output, session):
             if not fit.empty:
                 fig.add_trace(go.Scatter(x=fit["vencimiento"], y=fit["rendimiento_fit"],
                     mode="lines", name="Nelson-Siegel", line=dict(color="#34d399",width=2.5)))
-            fig.update_layout(height=320, paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
-                              font=dict(color="#94a3b8",size=11), xaxis_title="Vencimiento (años)",
+            fig.update_layout(height=320, paper_bgcolor="#FBFAF6", plot_bgcolor="#FFFFFF",
+                              font=dict(color="#3A4256",size=11), xaxis_title="Vencimiento (años)",
                               yaxis_title="Rendimiento (%)",
-                              legend=dict(orientation="h",bgcolor="rgba(0,0,0,0)"),
+                              legend=dict(orientation="h",bgcolor="rgba(255,255,255,0)"),
                               margin=dict(t=20,b=40,l=50,r=10))
-            fig.update_xaxes(gridcolor="#2d3748"); fig.update_yaxes(gridcolor="#2d3748")
+            fig.update_xaxes(gridcolor="#E8E2D2"); fig.update_yaxes(gridcolor="#E8E2D2")
             return ui.HTML(pio.to_html(fig, include_plotlyjs="cdn", full_html=False))
         except Exception as e:
-            return ui.tags.p(str(e), style="color:#f87171;font-size:12px")
+            return ui.tags.p(str(e), style="color:#E76F51;font-size:12px")
 
     @reactive.calc
     @reactive.event(input.b_btn)
@@ -1028,27 +1174,27 @@ def server(input, output, session):
     def bono_out():
         data, err = _bono()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Configura y presiona Calcular duración", style="color:#64748b")
+        if data is None: return ui.tags.p("Configura y presiona Calcular duración", style="color:#6B7280")
         shocks = data.get("sensibilidad_shocks", [])
         filas_bono = ""
         for s in shocks:
             shock_pb = int(s.get("shock_pb", 0))
-            color_s = "#34d399" if shock_pb < 0 else "#f87171"
+            color_s = "#2A9D8F" if shock_pb < 0 else "#f87171"
             dp_lin = s.get("dp_lineal", 0) or 0
             dp_dc  = s.get("dp_duracion_convexidad", 0) or 0
             dp_ex  = s.get("dp_reprice_exacto", 0) or 0
             p_new  = s.get("precio_nuevo", 0) or 0
             filas_bono += f"""<tr>
                 <td style="color:{color_s};font-weight:600;padding:9px 12px">{shock_pb:+d} pb</td>
-                <td style="color:#94a3b8;padding:9px 12px">{float(dp_lin)*100:.3f}%</td>
-                <td style="color:#60a5fa;padding:9px 12px">{float(dp_dc)*100:.3f}%</td>
-                <td style="color:#34d399;padding:9px 12px">{float(dp_ex)*100:.3f}%</td>
-                <td style="color:#e2e8f0;padding:9px 12px">${float(p_new):.2f}</td>
+                <td style="color:#3A4256;padding:9px 12px">{float(dp_lin)*100:.3f}%</td>
+                <td style="color:#0F1B33;padding:9px 12px">{float(dp_dc)*100:.3f}%</td>
+                <td style="color:#2A9D8F;padding:9px 12px">{float(dp_ex)*100:.3f}%</td>
+                <td style="color:#0E1326;padding:9px 12px">${float(p_new):.2f}</td>
             </tr>"""
         tabla_bono = f"""
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr style="background:#1e293b">
-                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+            <thead><tr style="background:#F7F3EB">
+                {"".join(f'<th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
                          for h in ["Shock","dP Lineal","dP D+C","dP Exacto","Precio nuevo"])}
             </tr></thead>
             <tbody>{filas_bono}</tbody>
@@ -1058,7 +1204,7 @@ def server(input, output, session):
                 ui.column(3, ui.div(ui.tags.p("Precio", class_="card-title"), ui.tags.p(f"${data.get('precio',0):.4f}", class_="metric-big"))),
                 ui.column(3, ui.div(ui.tags.p("D. Macaulay (anos)", class_="card-title"), ui.tags.p(f"{data.get('duracion_macaulay_anios',0):.4f}", class_="metric-big metric-pos"))),
                 ui.column(3, ui.div(ui.tags.p("D. Modificada", class_="card-title"), ui.tags.p(f"{data.get('duracion_modificada',0):.4f}", class_="metric-big metric-neu"))),
-                ui.column(3, ui.div(ui.tags.p("Convexidad", class_="card-title"), ui.tags.p(f"{data.get('convexidad',0):.2f}", class_="metric-big", style="color:#a78bfa"))),
+                ui.column(3, ui.div(ui.tags.p("Convexidad", class_="card-title"), ui.tags.p(f"{data.get('convexidad',0):.2f}", class_="metric-big", style="color:#F4A261"))),
             ),
             ui.tags.hr(),
             ui.tags.p("Sensibilidad ante shocks — 3 aproximaciones", class_="card-title"),
@@ -1079,7 +1225,7 @@ def server(input, output, session):
     def bs_out():
         data, err = _bs()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Ingresa parámetros y presiona Calcular", style="color:#64748b")
+        if data is None: return ui.tags.p("Ingresa parámetros y presiona Calcular", style="color:#6B7280")
         g = data.get("greeks", {})
         interp = data.get("interpretacion_greeks", {})
         paridad = data.get("paridad_put_call", {})
@@ -1092,39 +1238,58 @@ def server(input, output, session):
                     ui.tags.p("Paridad put-call", class_="card-title"),
                     ui.tags.p("Verificada" if paridad.get("verificada") else "Error",
                               style=f"color:{'#34d399' if paridad.get('verificada') else '#f87171'};font-weight:600"),
-                    ui.tags.p(f"Error numérico: {paridad.get('error_numerico','—'):.2e}", style="color:#64748b;font-size:11px"),
+                    ui.tags.p(f"Error numérico: {paridad.get('error_numerico','—'):.2e}", style="color:#6B7280;font-size:11px"),
                 )),
             ),
             ui.tags.hr(),
             ui.tags.p("Las 5 Greeks", class_="card-title"),
             ui.HTML(f"""
             <table style="width:100%;border-collapse:collapse;font-size:13px">
-                <thead><tr style="background:#1e293b">
-                    <th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px">GREEK</th>
-                    <th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px">SIMBOLO</th>
-                    <th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px">VALOR</th>
-                    <th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px">INTERPRETACION</th>
+                <thead><tr style="background:#F7F3EB">
+                    <th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px">GREEK</th>
+                    <th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px">SIMBOLO</th>
+                    <th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px">VALOR</th>
+                    <th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px">INTERPRETACION</th>
                 </tr></thead>
                 <tbody>
                     {"".join(
-                        f'<tr><td style="color:#e2e8f0;padding:9px 12px;font-weight:500">{n.title()}</td>'
-                        f'<td style="color:#a78bfa;padding:9px 12px;font-size:16px">{sym}</td>'
-                        f'<td style="color:#60a5fa;padding:9px 12px;font-weight:600;font-family:monospace">{float(g.get(n) or 0):.6f}</td>'
-                        f'<td style="color:#94a3b8;padding:9px 12px;font-size:11px">{str(interp.get(n,"—"))}</td></tr>'
+                        f'<tr><td style="color:#0E1326;padding:9px 12px;font-weight:500">{n.title()}</td>'
+                        f'<td style="color:#F4A261;padding:9px 12px;font-size:16px">{sym}</td>'
+                        f'<td style="color:#0F1B33;padding:9px 12px;font-weight:600;font-family:monospace">{float(g.get(n) or 0):.6f}</td>'
+                        f'<td style="color:#3A4256;padding:9px 12px;font-size:11px">{str(interp.get(n,"—"))}</td></tr>'
                         for n, sym in [("delta","d"),("gamma","G"),("vega","v"),("theta","T"),("rho","r")]
                     )}
                 </tbody>
             </table>"""),
         )
 
+    @output
+    @render.ui
+    def stress_port_info():
+        port    = _port_rv.get()
+        tickers = list(port.keys())
+        pesos   = list(port.values())
+        chips   = "".join(
+            f'<span style="display:inline-block;background:rgba(42,157,143,.08);color:#2A9D8F;'
+            f'border:1px solid rgba(42,157,143,.2);border-radius:100px;padding:3px 10px;'
+            f'font-family:JetBrains Mono,monospace;font-size:11px;margin:2px">{t} {w:.0%}</span>'
+            for t, w in zip(tickers, pesos)
+        )
+        return ui.div(
+            ui.tags.p("PORTAFOLIO ACTIVO", style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:#888;text-transform:uppercase;margin-bottom:6px"),
+            ui.HTML(f'<div style="margin-bottom:8px;line-height:2.2">{chips}</div>'),
+            ui.tags.p("Activos y pesos del tab Riesgo.",
+                      style="font-size:11px;color:#6B7280;font-style:italic;margin-bottom:8px"),
+        )
+
     @reactive.calc
     @reactive.event(input.st_btn)
     def _stress():
-        try:
-            tickers = [t.strip().upper() for t in input.st_tickers().split(",") if t.strip()]
-            pesos   = [float(p.strip()) for p in input.st_pesos().split(",") if p.strip()]
-        except ValueError:
-            return None, "Pesos inválidos"
+        port    = _port_rv.get()
+        tickers = list(port.keys())
+        pesos_d = list(port.values())
+        total   = sum(pesos_d) or 1
+        pesos   = [round(p/total, 4) for p in pesos_d]
         return api_post("/stress", {
             "tickers": tickers, "pesos": pesos, "betas": {},
             "var_base": float(input.st_var()), "sigma_base": float(input.st_sigma()),
@@ -1136,36 +1301,36 @@ def server(input, output, session):
     def stress_out():
         data, err = _stress()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Configura y presiona Aplicar escenarios", style="color:#64748b")
+        if data is None: return ui.tags.p("Configura y presiona Aplicar escenarios", style="color:#6B7280")
         escenarios = data.get("escenarios", {})
         labels = {
             "tasa_menos_200pb":"Tasa −200pb","tasa_mas_200pb":"Tasa +200pb",
-            "caida_mercado_20pct":"Caída −20%","caida_mercado_30pct":"Caída −30%",
+            "caida_mercado_20pct":"Caida -20%","caida_mercado_30pct":"Caida -30%",
             "volatilidad_doble":"Volatilidad ×2","combinado_tormenta_perfecta":"⚡ Tormenta perfecta",
         }
         filas_stress = ""
         for key, esc in escenarios.items():
             perdida = float(esc.get("perdida_total_pct") or esc.get("perdida_portafolio_pct") or 0)
             usd     = float(esc.get("perdida_total_usd") or esc.get("perdida_portafolio_usd") or 0)
-            color_p = "#34d399" if perdida > 0 else "#f87171"
+            color_p = "#2A9D8F" if perdida > 0 else "#f87171"
             filas_stress += f"""<tr>
-                <td style="color:#e2e8f0;padding:9px 12px;font-weight:500">{labels.get(key, key)}</td>
-                <td style="color:#94a3b8;padding:9px 12px;font-size:11px">{str(esc.get("shock_descripcion","—"))[:60]}</td>
+                <td style="color:#0E1326;padding:9px 12px;font-weight:500">{labels.get(key, key)}</td>
+                <td style="color:#3A4256;padding:9px 12px;font-size:11px">{str(esc.get("shock_descripcion","—"))[:60]}</td>
                 <td style="color:{color_p};font-weight:600;padding:9px 12px">{perdida:.2f}%</td>
-                <td style="color:#e2e8f0;padding:9px 12px">{fmt_usd(usd)}</td>
+                <td style="color:#0E1326;padding:9px 12px">{fmt_usd(usd)}</td>
             </tr>"""
         tabla_stress = f"""
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr style="background:#1e293b">
-                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+            <thead><tr style="background:#F7F3EB">
+                {"".join(f'<th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
                          for h in ["Escenario","Shock","Perdida %","Perdida USD"])}
             </tr></thead>
             <tbody>{filas_stress}</tbody>
         </table>"""
         return ui.div(
-            ui.tags.p(f"VaR base: {data.get('var_base_pct',0):.3f}% | Portafolio: {fmt_usd(data.get('valor_portafolio_usd'))}", style="color:#94a3b8;font-size:12px;margin-bottom:10px"),
+            ui.tags.p(f"VaR base: {data.get('var_base_pct',0):.3f}% | Portafolio: {fmt_usd(data.get('valor_portafolio_usd'))}", style="color:#3A4256;font-size:12px;margin-bottom:10px"),
             ui.HTML(tabla_stress),
-            ui.tags.p(str(data.get("interpretacion","")), style="color:#94a3b8;font-size:12px;margin-top:10px"),
+            ui.tags.p(str(data.get("interpretacion","")), style="color:#3A4256;font-size:12px;margin-top:10px"),
         )
 
     # ════════════════════════════════════════════════════
@@ -1177,16 +1342,50 @@ def server(input, output, session):
     def ml_status():
         data, err = api_get("/predict/status")
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if not data: return ui.tags.p("Sin estado", style="color:#64748b;font-size:12px")
+        if not data: return ui.tags.p("Sin estado", style="color:#6B7280;font-size:12px")
         disp = data.get("disponible", False)
         return ui.div(
             ui.tags.p("Modelo cargado" if disp else "Modelo no disponible",
                       style=f"color:{'#34d399' if disp else '#f59e0b'};font-weight:600"),
-            ui.tags.p(f"Versión: {data.get('model_version','—')}", style="color:#94a3b8;font-size:11px"),
-            ui.tags.p(f"Singleton ID: {data.get('singleton_id','—')}", style="color:#64748b;font-size:10px"),
+            ui.tags.p(f"Versión: {data.get('model_version','—')}", style="color:#3A4256;font-size:11px"),
+            ui.tags.p(f"Singleton ID: {data.get('singleton_id','—')}", style="color:#6B7280;font-size:10px"),
             ui.tags.p("Llamar /predict 3 veces → 'modelo cargado' aparece solo 1 vez en logs de uvicorn",
-                      style="color:#64748b;font-size:10px;margin-top:4px"),
+                      style="color:#6B7280;font-size:10px;margin-top:4px"),
         )
+
+    @reactive.effect
+    @reactive.event(input.ml_ticker)
+    def _auto_load_ml():
+        """Cargar indicadores actuales del activo seleccionado automáticamente."""
+        ticker = input.ml_ticker() if hasattr(input, 'ml_ticker') else "AAPL"
+        if not ticker: return
+        try:
+            data, err = api_get(f"/indicadores/{ticker}", {"fecha_inicio": "2024-01-01"})
+            if err or not data: return
+            datos = data.get("datos", [])
+            if not datos: return
+            ultimo = datos[-1]
+            resumen = data.get("resumen", {})
+            # Actualizar inputs con valores reales del activo
+            from shiny import ui as _ui
+            # Los updates de inputs se hacen con session.send_input_message
+            # pero en Shiny for Python usamos reactive.Value para pasar los valores
+            _ml_features_rv.set({
+                "rsi":   round(float(resumen.get("rsi_actual") or 50), 1),
+                "macd":  round(float(ultimo.get("macd_hist") or 0), 4),
+                "ewma":  round(float(resumen.get("boll_pct_b") or 0.5) * 0.02, 4),
+                "r5":    1.2,
+                "r21":   3.5,
+                "pctb":  round(float(resumen.get("boll_pct_b") or 0.5), 2),
+                "estoc": round(float(ultimo.get("esto_k") or 50), 1),
+            })
+        except Exception:
+            pass
+
+    _ml_features_rv = reactive.Value({
+        "rsi": 45.0, "macd": 0.5, "ewma": 0.012,
+        "r5": 1.2, "r21": 3.5, "pctb": 0.55, "estoc": 55.0,
+    })
 
     @reactive.calc
     @reactive.event(input.ml_btn)
@@ -1208,10 +1407,10 @@ def server(input, output, session):
     def ml_out():
         result = _ml()
         if result is None:
-            return ui.tags.p("Ingresa features y presiona Predecir régimen", style="color:#64748b")
+            return ui.tags.p("Ingresa features y presiona Predecir régimen", style="color:#6B7280")
         (data, err), features = result
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Sin respuesta del modelo", style="color:#64748b")
+        if data is None: return ui.tags.p("Sin respuesta del modelo", style="color:#6B7280")
 
         pred  = data.get("prediction", 0)
         label = data.get("prediction_label", "—")
@@ -1222,14 +1421,14 @@ def server(input, output, session):
             fnames = ["rsi_14","macd_hist","ewma_vol","ret_5d","ret_21d","pct_b_bollinger","estocastico_k"]
 
         filas_ml = "".join(
-            f'<tr><td style="color:#94a3b8;padding:8px 12px">{fn}</td><td style="color:#60a5fa;padding:8px 12px;font-family:monospace">{fv:.6f}</td></tr>'
+            f'<tr><td style="color:#3A4256;padding:8px 12px">{fn}</td><td style="color:#0F1B33;padding:8px 12px;font-family:monospace">{fv:.6f}</td></tr>'
             for fn, fv in zip(fnames, features)
         )
         tabla_ml = f"""
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr style="background:#1e293b">
-                <th style="color:#94a3b8;padding:8px 12px;text-align:left;font-size:11px">FEATURE</th>
-                <th style="color:#94a3b8;padding:8px 12px;text-align:left;font-size:11px">VALOR</th>
+            <thead><tr style="background:#F7F3EB">
+                <th style="color:#3A4256;padding:8px 12px;text-align:left;font-size:11px">FEATURE</th>
+                <th style="color:#3A4256;padding:8px 12px;text-align:left;font-size:11px">VALOR</th>
             </tr></thead>
             <tbody>{filas_ml}</tbody>
         </table>"""
@@ -1238,7 +1437,7 @@ def server(input, output, session):
         return ui.div(
             ui.tags.p(label_clean, style=f"color:{color};font-size:36px;font-weight:700;text-align:center;margin:16px 0"),
             ui.tags.p(f"Activo: {data.get('ticker','—')} | Modelo: {data.get('model_version','—')}",
-                      style="color:#94a3b8;font-size:12px;text-align:center"),
+                      style="color:#3A4256;font-size:12px;text-align:center"),
             ui.tags.hr(),
             ui.tags.p("Features enviadas al modelo", class_="card-title"),
             ui.HTML(tabla_ml),
@@ -1257,7 +1456,7 @@ def server(input, output, session):
     def macro_out():
         data, err = _macro()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Presiona Actualizar desde FRED", style="color:#64748b")
+        if data is None: return ui.tags.p("Presiona Actualizar desde FRED", style="color:#6B7280")
         datos = data.get("datos", {})
         iconos = {"DGS3MO":"[Rf]","DGS10":"[T10]","CPIAUCSL":"[CPI]","UNRATE":"[U]","FEDFUNDS":"[Fed]","VIXCLS":"[VIX]"}
         cards = []
@@ -1267,8 +1466,8 @@ def server(input, output, session):
             cards.append(ui.column(4, ui.div(
                 ui.tags.p(f"{iconos.get(serie,'📌')} {info.get('nombre',serie)}", class_="card-title"),
                 ui.tags.p(f"{valor:.2f}%" if valor else "—", class_="metric-big"),
-                ui.tags.p(info.get("fecha","—"), style="color:#64748b;font-size:11px"),
-                ui.tags.p(info.get("interpretacion",""), style="color:#94a3b8;font-size:11px;margin-top:4px"),
+                ui.tags.p(info.get("fecha","—"), style="color:#6B7280;font-size:11px"),
+                ui.tags.p(info.get("interpretacion",""), style="color:#3A4256;font-size:11px;margin-top:4px"),
                 class_="card",
             )))
         ctx = data.get("contexto_macro", {})
@@ -1283,14 +1482,14 @@ def server(input, output, session):
             interp = str(info.get("interpretacion", ""))
             val_str = f"{valor:.2f}%" if valor is not None else "—"
             cards_html += f"""
-            <div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:12px;padding:16px;margin-bottom:12px">
-                <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:6px">{label} {nombre}</p>
+            <div style="background:#FFFFFF;border:1px solid #2d3748;border-radius:12px;padding:16px;margin-bottom:12px">
+                <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:#3A4256;margin-bottom:6px">{label} {nombre}</p>
                 <p style="font-family:monospace;font-size:26px;font-weight:700;color:#60a5fa;margin:4px 0">{val_str}</p>
-                <p style="color:#64748b;font-size:11px">{fecha}</p>
-                <p style="color:#94a3b8;font-size:11px;margin-top:4px">{interp}</p>
+                <p style="color:#6B7280;font-size:11px">{fecha}</p>
+                <p style="color:#3A4256;font-size:11px;margin-top:4px">{interp}</p>
             </div>"""
         impacto_html = "".join(
-            f'<p style="color:#60a5fa;font-size:12px;margin:4px 0">→ {i}</p>'
+            f'<p style="color:#0F1B33;font-size:12px;margin:4px 0">→ {i}</p>'
             for i in ctx.get("impacto_portafolio", [])
         )
         return ui.div(
@@ -1298,9 +1497,9 @@ def server(input, output, session):
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
                 {cards_html}
             </div>
-            <div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:12px;padding:16px">
-                <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:8px">CONTEXTO MACRO INTEGRADO</p>
-                <p style="color:#94a3b8;font-size:13px;margin-bottom:8px">{str(ctx.get("descripcion",""))}</p>
+            <div style="background:#FFFFFF;border:1px solid #2d3748;border-radius:12px;padding:16px">
+                <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:#3A4256;margin-bottom:8px">CONTEXTO MACRO INTEGRADO</p>
+                <p style="color:#3A4256;font-size:13px;margin-bottom:8px">{str(ctx.get("descripcion",""))}</p>
                 {impacto_html}
             </div>"""),
         )
@@ -1318,14 +1517,14 @@ def server(input, output, session):
     def comp_out():
         data, err = _comp()
         if err: return ui.div(ui.tags.p(err, class_="err"))
-        if data is None: return ui.tags.p("Ingresa tickers y presiona Comparar", style="color:#64748b")
+        if data is None: return ui.tags.p("Ingresa tickers y presiona Comparar", style="color:#6B7280")
         comp = data.get("comparacion", {})
         filas_comp = ""
         for ticker, d in sorted(comp.items(), key=lambda x: x[1].get("sharpe_ratio") or 0, reverse=True):
             ret    = float(d.get("retorno_total") or 0)
             sharpe = float(d.get("sharpe_ratio") or 0)
-            rc = "#34d399" if ret > 0 else "#f87171"
-            sc = "#34d399" if sharpe > 0 else "#f87171"
+            rc = "#2A9D8F" if ret > 0 else "#f87171"
+            sc = "#2A9D8F" if sharpe > 0 else "#f87171"
             dd = fmt_pct(d.get("max_drawdown"))
             vol = fmt_pct(d.get("volatilidad_anual"))
             tendencia = str(d.get("tendencia_ema") or "—")
@@ -1333,19 +1532,19 @@ def server(input, output, session):
             pais = str(d.get("pais") or "—")
             ranking = int(d.get("ranking_sharpe") or 0)
             filas_comp += f"""<tr>
-                <td style="color:#e2e8f0;padding:9px 12px;font-weight:500">#{ranking} {ticker}</td>
-                <td style="color:#94a3b8;padding:9px 12px">{nombre}</td>
-                <td style="color:#94a3b8;padding:9px 12px">{pais}</td>
+                <td style="color:#0E1326;padding:9px 12px;font-weight:500">#{ranking} {ticker}</td>
+                <td style="color:#3A4256;padding:9px 12px">{nombre}</td>
+                <td style="color:#3A4256;padding:9px 12px">{pais}</td>
                 <td style="color:{rc};font-weight:600;padding:9px 12px">{ret*100:.1f}%</td>
-                <td style="color:#94a3b8;padding:9px 12px">{vol}</td>
+                <td style="color:#3A4256;padding:9px 12px">{vol}</td>
                 <td style="color:{sc};font-weight:600;padding:9px 12px">{sharpe:.3f}</td>
-                <td style="color:#f87171;padding:9px 12px">{dd}</td>
-                <td style="color:#60a5fa;padding:9px 12px;font-size:11px">{tendencia}</td>
+                <td style="color:#E76F51;padding:9px 12px">{dd}</td>
+                <td style="color:#0F1B33;padding:9px 12px;font-size:11px">{tendencia}</td>
             </tr>"""
         tabla_comp = f"""
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr style="background:#1e293b">
-                {"".join(f'<th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
+            <thead><tr style="background:#F7F3EB">
+                {"".join(f'<th style="color:#3A4256;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase">{h}</th>'
                          for h in ["Ranking","Nombre","Pais","Retorno","Volatilidad","Sharpe","Max DD","Tendencia"])}
             </tr></thead>
             <tbody>{filas_comp}</tbody>
@@ -1370,27 +1569,27 @@ def server(input, output, session):
                         hovertemplate=f"<b>{ticker}</b><br>%{{x}}<br>Base 100: %{{y:.1f}}<extra></extra>",
                     ))
             if fig_comp.data:
-                fig_comp.add_hline(y=100, line_color="#334155", line_width=1,
+                fig_comp.add_hline(y=100, line_color="#D3CCBC", line_width=1,
                                    line_dash="dot", annotation_text="Base 100")
                 fig_comp.update_layout(
                     height=300,
-                    paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
-                    font=dict(color="#94a3b8", size=11),
+                    paper_bgcolor="#FBFAF6", plot_bgcolor="#FFFFFF",
+                    font=dict(color="#3A4256", size=11),
                     yaxis_title="Rendimiento acumulado (base 100)",
-                    legend=dict(orientation="h", y=-0.22, bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+                    legend=dict(orientation="h", y=-0.22, bgcolor="rgba(255,255,255,0)", font=dict(size=10)),
                     margin=dict(t=20, b=70, l=50, r=10),
                 )
-                fig_comp.update_xaxes(gridcolor="#2d3748")
-                fig_comp.update_yaxes(gridcolor="#2d3748")
+                fig_comp.update_xaxes(gridcolor="#E8E2D2")
+                fig_comp.update_yaxes(gridcolor="#E8E2D2")
                 comp_chart_html = pio.to_html(fig_comp, include_plotlyjs=False, full_html=False)
             else:
-                comp_chart_html = "<p style='color:#64748b;font-size:11px'>Datos de rendimiento acumulado no disponibles en esta respuesta del backend.</p>"
+                comp_chart_html = "<p style='color:#6B7280;font-size:11px'>Datos de rendimiento acumulado no disponibles en esta respuesta del backend.</p>"
         except Exception as e:
             comp_chart_html = f"<p style='color:#f87171;font-size:11px'>Error grafico acumulado: {e}</p>"
 
         return ui.div(
             ui.tags.p(f"Mejor Sharpe: {data.get('mejor_sharpe','—')} | Mayor retorno: {data.get('mejor_retorno','—')} | Menor vol: {data.get('menor_volatilidad','—')}",
-                      style="color:#60a5fa;font-size:12px;font-weight:600;margin-bottom:10px"),
+                      style="color:#0F1B33;font-size:12px;font-weight:600;margin-bottom:10px"),
             ui.HTML(tabla_comp),
             ui.tags.hr(style="margin:16px 0"),
             ui.tags.p("Rendimiento acumulado base 100", class_="card-title"),
