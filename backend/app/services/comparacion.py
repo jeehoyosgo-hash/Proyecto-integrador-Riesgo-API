@@ -82,6 +82,10 @@ def comparar_activos(
 
         info = CATALOGO.get(ticker, {})
 
+        # Serie acumulada base 100 para gráfico benchmark
+        base100 = (precios / precios.iloc[0] * 100).round(2).tolist()
+        fechas_list = df["fecha"].tolist() if "fecha" in df.columns else list(range(len(precios)))
+
         comparacion[ticker] = {
             "ticker":              ticker,
             "nombre":              info.get("nombre", ticker),
@@ -105,6 +109,9 @@ def comparar_activos(
             "rsi_actual":          rsi_actual,
             "tendencia_ema":       tendencia,
             "observaciones":       len(df),
+            # Gráfico acumulado base 100
+            "retornos_acumulados_base100": base100,
+            "fechas_acumulado":            fechas_list,
         }
 
     # Ranking por Sharpe Ratio
@@ -114,16 +121,34 @@ def comparar_activos(
     for ticker in comparacion:
         comparacion[ticker]["ranking_sharpe"] = ranking.get(ticker, 0)
 
+    # Matriz de correlación entre activos (para heatmap Markowitz)
+    try:
+        rend_dict = {}
+        for ticker in tickers:
+            if datos[ticker] is not None:
+                p = datos[ticker]["cierre"]
+                rend_dict[ticker] = np.log(p / p.shift(1)).dropna()
+        df_rend = pd.DataFrame(rend_dict).dropna()
+        if len(df_rend) > 10:
+            corr = df_rend.corr().round(4)
+            matriz_corr = {t: {t2: float(corr.loc[t, t2]) for t2 in corr.columns}
+                           for t in corr.index}
+        else:
+            matriz_corr = {}
+    except Exception:
+        matriz_corr = {}
+
     return _limpiar_dict({
-        "tickers":         tickers,
-        "fecha_inicio":    fecha_inicio,
-        "fecha_fin":       fecha_fin or "hoy",
-        "total_activos":   len(comparacion),
-        "errores":         errores,
-        "comparacion":     comparacion,
-        "mejor_sharpe":    activos_validos[0][0] if activos_validos else None,
-        "mejor_retorno":   max(comparacion.items(), key=lambda x: x[1]["retorno_total"] or -99)[0] if comparacion else None,
-        "menor_volatilidad": min(comparacion.items(), key=lambda x: x[1]["volatilidad_anual"] or 99)[0] if comparacion else None,
+        "tickers":            tickers,
+        "fecha_inicio":       fecha_inicio,
+        "fecha_fin":          fecha_fin or "hoy",
+        "total_activos":      len(comparacion),
+        "errores":            errores,
+        "comparacion":        comparacion,
+        "mejor_sharpe":       activos_validos[0][0] if activos_validos else None,
+        "mejor_retorno":      max(comparacion.items(), key=lambda x: x[1]["retorno_total"] or -99)[0] if comparacion else None,
+        "menor_volatilidad":  min(comparacion.items(), key=lambda x: x[1]["volatilidad_anual"] or 99)[0] if comparacion else None,
+        "matriz_correlacion": matriz_corr,
     })
 
 

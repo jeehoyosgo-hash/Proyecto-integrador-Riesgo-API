@@ -1,14 +1,14 @@
-"""
-main.py — FastAPI: todos los endpoints de la rúbrica
+﻿"""
+main.py â€” FastAPI: todos los endpoints de la rÃºbrica
 =====================================================
-CORRECCIONES aplicadas (vs versión anterior):
+CORRECCIONES aplicadas (vs versiÃ³n anterior):
 
 1. ASYNC: todas las rutas que hacen I/O externo usan async def + await
 2. BaseSettings: FRED_API_KEY y config global vienen de app.config (no os.getenv)
 3. Depends() CONECTADO: /macro usa get_macro_data(), servicios inyectados en /alertas
-4. ACTIVOS_BASE sincronizado con datos.py (10 activos del catálogo curado)
+4. ACTIVOS_BASE sincronizado con datos.py (10 activos del catÃ¡logo curado)
 5. model_validator para validaciones cruzadas entre campos Pydantic v2
-6. response_model añadido en endpoints principales
+6. response_model aÃ±adido en endpoints principales
 7. rsi_sobrecompra / rsi_sobreventa se pasan al servicio de alertas
 8. imports estandarizados con prefijo app.
 """
@@ -27,10 +27,10 @@ from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-# ── Configuración (BaseSettings) ──────────────────────────────────────────────
+# â”€â”€ ConfiguraciÃ³n (BaseSettings) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 from app.config import get_settings
 
-# ── Servicios ─────────────────────────────────────────────────────────────────
+# â”€â”€ Servicios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 from app.services.datos import (
     descargar_precios, obtener_info_activo, descargar_multiples_precios,
     CATALOGO, ACTIVOS_BASE, ACTIVOS_README, ACTIVOS_INFO,
@@ -49,7 +49,7 @@ from app.services.riesgo_completo import (
     stress_testing, analisis_volatilidad_ewma,
 )
 
-# ── Inyección de dependencias ──────────────────────────────────────────────────
+# â”€â”€ InyecciÃ³n de dependencias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 from app.dependencies import (
     get_macro_data,
     get_technical_indicators,
@@ -57,21 +57,21 @@ from app.dependencies import (
     get_portfolio_analyzer,
 )
 
-# ── ML (opcional) ─────────────────────────────────────────────────────────────
+# â”€â”€ ML (opcional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 try:
     from app.ml.predictor import get_predictor
     ML_DISPONIBLE = True
 except Exception:
     ML_DISPONIBLE = False
 
-# ── CRUD en memoria (portafolios guardados) ────────────────────────────────────
+# â”€â”€ CRUD en memoria (portafolios guardados) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _portafolios_db: Dict[int, dict] = {}
 _portafolio_counter: int = 0
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# MODELOS PYDANTIC — request / response
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODELOS PYDANTIC â€” request / response
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 class HealthCheck(BaseModel):
     status: str
@@ -96,7 +96,7 @@ class PortafolioRequest(BaseModel):
         default=["AAPL", "JPM", "XOM", "MSFT", "EC"],
         min_length=2,
         max_length=15,
-        description="Lista de tickers del portafolio (mín 2, máx 15)",
+        description="Lista de tickers del portafolio (mÃ­n 2, mÃ¡x 15)",
     )
     pesos: List[float] = Field(
         default=[0.25, 0.25, 0.20, 0.20, 0.10],
@@ -114,7 +114,7 @@ class PortafolioRequest(BaseModel):
         default=0.95,
         ge=0.90,
         le=0.99,
-        description="Nivel de confianza para VaR (0.90 – 0.99)",
+        description="Nivel de confianza para VaR (0.90 â€“ 0.99)",
     )
 
     @field_validator("pesos")
@@ -132,8 +132,8 @@ class PortafolioRequest(BaseModel):
     def longitud_coherente(self) -> "PortafolioRequest":
         if len(self.pesos) != len(self.tickers):
             raise ValueError(
-                f"Número de pesos ({len(self.pesos)}) debe coincidir "
-                f"con número de tickers ({len(self.tickers)})"
+                f"NÃºmero de pesos ({len(self.pesos)}) debe coincidir "
+                f"con nÃºmero de tickers ({len(self.tickers)})"
             )
         return self
 
@@ -151,7 +151,7 @@ class VarResponse(BaseModel):
 class OpcionRequest(BaseModel):
     S:     float = Field(..., gt=0,   description="Precio del subyacente (USD)")
     K:     float = Field(..., gt=0,   description="Strike / precio de ejercicio")
-    T:     float = Field(..., gt=0,   description="Tiempo al vencimiento en años (ej: 0.5)")
+    T:     float = Field(..., gt=0,   description="Tiempo al vencimiento en aÃ±os (ej: 0.5)")
     r:     float = Field(..., ge=0, le=0.30, description="Tasa libre de riesgo anual")
     sigma: float = Field(..., gt=0, le=5.0,  description="Volatilidad anual (ej: 0.20 = 20%)")
     tipo:  str   = Field(default="call", description="'call' o 'put'")
@@ -166,11 +166,11 @@ class OpcionRequest(BaseModel):
 
 
 class BonoRequest(BaseModel):
-    cupon_anual:       float = Field(..., gt=0, le=0.50, description="Tasa cupón anual (ej: 0.05 = 5%)")
-    vencimiento_anios: int   = Field(..., gt=0, le=50,   description="Vencimiento en años")
+    cupon_anual:       float = Field(..., gt=0, le=0.50, description="Tasa cupÃ³n anual (ej: 0.05 = 5%)")
+    vencimiento_anios: int   = Field(..., gt=0, le=50,   description="Vencimiento en aÃ±os")
     valor_nominal:     float = Field(default=1000.0, gt=0, description="Valor nominal del bono")
     ytm:               float = Field(..., gt=0, le=0.50, description="Yield to maturity anual")
-    pagos_por_anio:    int   = Field(default=2, ge=1, le=12, description="Frecuencia de pagos al año")
+    pagos_por_anio:    int   = Field(default=2, ge=1, le=12, description="Frecuencia de pagos al aÃ±o")
 
 
 class StressRequest(BaseModel):
@@ -222,27 +222,27 @@ class PortafolioGuardarRequest(BaseModel):
     @model_validator(mode="after")
     def longitud_coherente(self) -> "PortafolioGuardarRequest":
         if len(self.pesos) != len(self.tickers):
-            raise ValueError("Número de pesos debe coincidir con número de tickers")
+            raise ValueError("NÃºmero de pesos debe coincidir con nÃºmero de tickers")
         return self
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # APP FASTAPI
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 app = FastAPI(
-    title="API de Análisis de Riesgo Financiero — USTA",
+    title="API de AnÃ¡lisis de Riesgo Financiero â€” USTA",
     description="""
-Sistema integral de análisis de riesgo financiero.
+Sistema integral de anÃ¡lisis de riesgo financiero.
 
-**Portafolio:** 10 activos, 4 regiones (Norteamérica, Europa, LatAm, Asia), 5 sectores.
+**Portafolio:** 10 activos, 4 regiones (NorteamÃ©rica, Europa, LatAm, Asia), 5 sectores.
 
-**Módulos:**
-- Capa 1 — Datos: Yahoo Finance + FRED API + fallback sintético
-- Capa 2 — Riesgo clásico: Indicadores técnicos, rendimientos, EWMA/GARCH, CAPM, VaR+Kupiec, Markowitz
-- Capa 3 — Renta fija y derivados: Nelson-Siegel, duración/convexidad, Black-Scholes, Stress Testing
-- Capa 4 — ML: RandomForest → Singleton → /predict
-- Capa 5 — Infraestructura: pytest + Docker multi-stage + Render + GitHub Actions
+**MÃ³dulos:**
+- Capa 1 â€” Datos: Yahoo Finance + FRED API + fallback sintÃ©tico
+- Capa 2 â€” Riesgo clÃ¡sico: Indicadores tÃ©cnicos, rendimientos, EWMA/GARCH, CAPM, VaR+Kupiec, Markowitz
+- Capa 3 â€” Renta fija y derivados: Nelson-Siegel, duraciÃ³n/convexidad, Black-Scholes, Stress Testing
+- Capa 4 â€” ML: RandomForest â†’ Singleton â†’ /predict
+- Capa 5 â€” Infraestructura: pytest + Docker multi-stage + Render + GitHub Actions
 
 **Autores:** Ver README.md
     """,
@@ -259,29 +259,29 @@ app.add_middleware(
 )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CAPA 1 — DATOS Y PERSISTENCIA
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# CAPA 1 â€” DATOS Y PERSISTENCIA
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 @app.get("/", response_model=HealthCheck, tags=["Sistema"])
 async def health_check() -> HealthCheck:
-    """Estado del sistema. Verifica que la API está activa."""
+    """Estado del sistema. Verifica que la API estÃ¡ activa."""
     return HealthCheck(
         status="ok",
-        mensaje=f"API de Riesgo Financiero v3.1 — {len(CATALOGO)} activos disponibles",
+        mensaje=f"API de Riesgo Financiero v3.1 â€” {len(CATALOGO)} activos disponibles",
         version="3.1.0",
         activos_base=ACTIVOS_BASE,
         total_activos=len(CATALOGO),
     )
 
 
-@app.get("/activos", tags=["Capa 1 — Datos"])
+@app.get("/activos", tags=["Capa 1 â€” Datos"])
 async def listar_activos(
-    region: Optional[str] = Query(None, description="Filtrar por región"),
+    region: Optional[str] = Query(None, description="Filtrar por regiÃ³n"),
     sector: Optional[str] = Query(None, description="Filtrar por sector"),
-    pais:   Optional[str] = Query(None, description="Filtrar por país"),
+    pais:   Optional[str] = Query(None, description="Filtrar por paÃ­s"),
 ) -> dict:
-    """Lista todos los activos del catálogo con filtros opcionales."""
+    """Lista todos los activos del catÃ¡logo con filtros opcionales."""
     activos = [
         {"ticker": t, **info}
         for t, info in CATALOGO.items()
@@ -299,13 +299,13 @@ async def listar_activos(
     }
 
 
-@app.get("/precios/{ticker}", tags=["Capa 1 — Datos"])
+@app.get("/precios/{ticker}", tags=["Capa 1 â€” Datos"])
 async def obtener_precios(
     ticker:       str,
     fecha_inicio: str           = Query(default="2022-01-01", description="Fecha inicio YYYY-MM-DD"),
     fecha_fin:    Optional[str] = Query(default=None, description="Fecha fin (None = hoy)"),
 ) -> dict:
-    """Retorna precios históricos de un activo (OHLCV)."""
+    """Retorna precios histÃ³ricos de un activo (OHLCV)."""
     ticker = ticker.upper()
     if ticker not in CATALOGO:
         raise HTTPException(
@@ -323,12 +323,12 @@ async def obtener_precios(
         "fecha_inicio": fecha_inicio,
         "fecha_fin":    fecha_fin or "hoy",
         "total_dias":   len(df),
-        "fuente":       "Yahoo Finance (fallback sintético si no hay conexión)",
+        "fuente":       "Yahoo Finance (fallback sintÃ©tico si no hay conexiÃ³n)",
         "datos":        df.to_dict(orient="records"),
     }
 
 
-@app.post("/portafolios", tags=["Capa 1 — Datos"], status_code=201)
+@app.post("/portafolios", tags=["Capa 1 â€” Datos"], status_code=201)
 async def guardar_portafolio(req: PortafolioGuardarRequest) -> dict:
     """Guarda un portafolio en memoria (CRUD simple)."""
     global _portafolio_counter
@@ -346,16 +346,16 @@ async def guardar_portafolio(req: PortafolioGuardarRequest) -> dict:
     }
 
 
-@app.get("/portafolios", tags=["Capa 1 — Datos"])
+@app.get("/portafolios", tags=["Capa 1 â€” Datos"])
 async def listar_portafolios() -> dict:
-    """Lista todos los portafolios guardados en sesión."""
+    """Lista todos los portafolios guardados en sesiÃ³n."""
     return {
         "total":       len(_portafolios_db),
         "portafolios": list(_portafolios_db.values()),
     }
 
 
-@app.delete("/portafolios/{id}", tags=["Capa 1 — Datos"])
+@app.delete("/portafolios/{id}", tags=["Capa 1 â€” Datos"])
 async def eliminar_portafolio(id: int) -> dict:
     """Elimina un portafolio guardado."""
     if id not in _portafolios_db:
@@ -364,18 +364,18 @@ async def eliminar_portafolio(id: int) -> dict:
     return {"mensaje": f"Portafolio {id} eliminado."}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CAPA 2 — ANÁLISIS CLÁSICO DE RIESGO
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# CAPA 2 â€” ANÃLISIS CLÃSICO DE RIESGO
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-@app.get("/rendimientos/{ticker}", tags=["Capa 2 — Riesgo"])
+@app.get("/rendimientos/{ticker}", tags=["Capa 2 â€” Riesgo"])
 async def obtener_rendimientos(
     ticker:       str,
     fecha_inicio: str           = Query(default="2022-01-01"),
     fecha_fin:    Optional[str] = Query(default=None),
 ) -> dict:
     """
-    Rendimientos simples y logarítmicos con estadísticas descriptivas
+    Rendimientos simples y logarÃ­tmicos con estadÃ­sticas descriptivas
     y pruebas de normalidad (Jarque-Bera, Shapiro-Wilk).
     """
     ticker = ticker.upper()
@@ -387,7 +387,7 @@ async def obtener_rendimientos(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/indicadores/{ticker}", tags=["Capa 2 — Riesgo"])
+@app.get("/indicadores/{ticker}", tags=["Capa 2 â€” Riesgo"])
 async def obtener_indicadores(
     ticker:       str,
     fecha_inicio: str           = Query(default="2022-01-01"),
@@ -395,9 +395,9 @@ async def obtener_indicadores(
     svc = Depends(get_technical_indicators),
 ) -> dict:
     """
-    Indicadores técnicos: SMA(20/50/200), EMA(20/50), RSI(14), MACD,
-    Bandas de Bollinger, Oscilador Estocástico.
-    Incluye señales automáticas del último día.
+    Indicadores tÃ©cnicos: SMA(20/50/200), EMA(20/50), RSI(14), MACD,
+    Bandas de Bollinger, Oscilador EstocÃ¡stico.
+    Incluye seÃ±ales automÃ¡ticas del Ãºltimo dÃ­a.
     """
     ticker = ticker.upper()
     if ticker not in CATALOGO:
@@ -408,19 +408,19 @@ async def obtener_indicadores(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/volatilidad/{ticker}", tags=["Capa 2 — Riesgo"])
+@app.get("/volatilidad/{ticker}", tags=["Capa 2 â€” Riesgo"])
 async def obtener_volatilidad(
     ticker:        str,
     fecha_inicio:  str   = Query(default="2022-01-01"),
     lambda_ewma:   float = Query(
         default=0.94, ge=0.80, le=0.99,
-        description="λ para EWMA (0.94 = RiskMetrics estándar)",
+        description="Î» para EWMA (0.94 = RiskMetrics estÃ¡ndar)",
     ),
     incluir_garch: bool  = Query(default=True, description="Ajustar ARCH/GARCH"),
 ) -> dict:
     """
-    EWMA con λ configurable + ARCH(1), GARCH(1,1), EGARCH(1,1).
-    Tabla comparativa AIC/BIC + selección del mejor modelo + pronóstico 5 días.
+    EWMA con Î» configurable + ARCH(1), GARCH(1,1), EGARCH(1,1).
+    Tabla comparativa AIC/BIC + selecciÃ³n del mejor modelo + pronÃ³stico 5 dÃ­as.
     """
     ticker = ticker.upper()
     if ticker not in CATALOGO:
@@ -456,8 +456,12 @@ async def obtener_volatilidad(
                 ]:
                     try:
                         fit = spec.fit(disp="off")
-                        fc  = fit.forecast(horizon=5)
-                        vol_fc = float(np.sqrt(fc.variance.values[-1, -1])) / 100
+                        try:
+                            fc = fit.forecast(horizon=1)
+                            vol_fc = float(np.sqrt(fc.variance.values[-1, -1])) / 100
+                        except Exception:
+                            sim = fit.forecast(horizon=1, method="simulation", simulations=500)
+                            vol_fc = float(np.sqrt(sim.variance.values[-1, -1])) / 100
                         p = fit.params
                         garch_modelos.append({
                             "modelo":             nombre_m,
@@ -481,12 +485,12 @@ async def obtener_volatilidad(
                     "interpretacion": (
                         f"Modelo seleccionado por menor AIC: {mejor['modelo']}. "
                         f"AIC={mejor['aic']:.2f}, BIC={mejor['bic']:.2f}."
-                        if mejor else "No se pudo ajustar ningún modelo GARCH."
+                        if mejor else "No se pudo ajustar ningÃºn modelo GARCH."
                     ),
                 }
             except ImportError:
                 resultado["garch"] = {
-                    "error": "Librería 'arch' no instalada. Ejecuta: pip install arch"
+                    "error": "LibrerÃ­a 'arch' no instalada. Ejecuta: pip install arch"
                 }
 
         return resultado
@@ -494,20 +498,20 @@ async def obtener_volatilidad(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/var", tags=["Capa 2 — Riesgo"])
+@app.post("/var", tags=["Capa 2 â€” Riesgo"])
 async def calcular_var(
     portafolio: PortafolioRequest,
     svc = Depends(get_risk_calculator),
 ) -> dict:
     """
-    VaR y CVaR con 3 métodos: paramétrico, histórico, Monte Carlo (10,000 sim.)
-    + backtesting de Kupiec (LR_POF estadístico formal con chi²).
+    VaR y CVaR con 3 mÃ©todos: paramÃ©trico, histÃ³rico, Monte Carlo (10,000 sim.)
+    + backtesting de Kupiec (LR_POF estadÃ­stico formal con chiÂ²).
     """
     invalidos = [t for t in portafolio.tickers if t not in CATALOGO]
     if invalidos:
         raise HTTPException(
             status_code=404,
-            detail=f"Tickers no válidos: {invalidos}. Consulta GET /activos.",
+            detail=f"Tickers no vÃ¡lidos: {invalidos}. Consulta GET /activos.",
         )
     try:
         datos = descargar_multiples_precios(
@@ -533,7 +537,7 @@ async def calcular_var(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/capm", tags=["Capa 2 — Riesgo"])
+@app.get("/capm", tags=["Capa 2 â€” Riesgo"])
 async def obtener_capm(
     tickers:            List[str]    = Query(default=ACTIVOS_README),
     tasa_libre_riesgo:  float        = Query(default=0.0525, description="Rf anual (si no se usa /macro)"),
@@ -543,17 +547,17 @@ async def obtener_capm(
 ) -> dict:
     """
     Beta y rendimiento esperado CAPM para cada activo.
-    La tasa libre de riesgo se obtiene automáticamente de FRED via Depends(get_macro_data).
-    Si FRED no está disponible, usa el valor por defecto del parámetro.
+    La tasa libre de riesgo se obtiene automÃ¡ticamente de FRED via Depends(get_macro_data).
+    Si FRED no estÃ¡ disponible, usa el valor por defecto del parÃ¡metro.
     """
-    # Usar Rf de FRED si está disponible
+    # Usar Rf de FRED si estÃ¡ disponible
     rf_fred = macro.get("tasa_libre_riesgo")
     rf = rf_fred / 100 if rf_fred else tasa_libre_riesgo
 
     tickers = [t.upper() for t in tickers]
     invalidos = [t for t in tickers if t not in CATALOGO]
     if invalidos:
-        raise HTTPException(status_code=404, detail=f"Tickers no válidos: {invalidos}")
+        raise HTTPException(status_code=404, detail=f"Tickers no vÃ¡lidos: {invalidos}")
     try:
         resultado = calcular_capm(
             tickers,
@@ -568,7 +572,7 @@ async def obtener_capm(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/frontera-eficiente", tags=["Capa 2 — Riesgo"])
+@app.post("/frontera-eficiente", tags=["Capa 2 â€” Riesgo"])
 async def obtener_frontera(
     portafolio:      PortafolioRequest,
     permitir_cortos: bool = Query(
@@ -578,12 +582,12 @@ async def obtener_frontera(
     svc = Depends(get_portfolio_analyzer),
 ) -> dict:
     """
-    Frontera eficiente de Markowitz con optimización QP.
-    Retorna portafolio de mínima varianza, máximo Sharpe y simulación de 500 portafolios.
+    Frontera eficiente de Markowitz con optimizaciÃ³n QP.
+    Retorna portafolio de mÃ­nima varianza, mÃ¡ximo Sharpe y simulaciÃ³n de 500 portafolios.
     """
     invalidos = [t for t in portafolio.tickers if t not in CATALOGO]
     if invalidos:
-        raise HTTPException(status_code=404, detail=f"Tickers no válidos: {invalidos}")
+        raise HTTPException(status_code=404, detail=f"Tickers no vÃ¡lidos: {invalidos}")
     try:
         frontera = calcular_frontera_eficiente(
             portafolio.tickers,
@@ -593,9 +597,9 @@ async def obtener_frontera(
         frontera["configuracion"] = {
             "permitir_cortos": permitir_cortos,
             "descripcion": (
-                "Solo posiciones largas (w_i ≥ 0). Más realista para inversores minoristas."
+                "Solo posiciones largas (w_i â‰¥ 0). MÃ¡s realista para inversores minoristas."
                 if not permitir_cortos
-                else "Ventas en corto permitidas (w_i ∈ ℝ). Frontera teórica más amplia."
+                else "Ventas en corto permitidas (w_i âˆˆ â„). Frontera teÃ³rica mÃ¡s amplia."
             ),
         }
         return frontera
@@ -603,7 +607,7 @@ async def obtener_frontera(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/alertas", tags=["Capa 2 — Riesgo ★ Módulo 7"])
+@app.get("/alertas", tags=["Capa 2 â€” Riesgo â˜… MÃ³dulo 7"])
 async def obtener_alertas(
     tickers:          List[str] = Query(default=ACTIVOS_README),
     fecha_inicio:     str       = Query(default="2023-01-01"),
@@ -617,19 +621,19 @@ async def obtener_alertas(
     ),
 ) -> dict:
     """
-    Señales automáticas de compra/venta para cada activo basadas en:
-    RSI, MACD, Bandas de Bollinger, Cruce EMA, Oscilador Estocástico.
+    SeÃ±ales automÃ¡ticas de compra/venta para cada activo basadas en:
+    RSI, MACD, Bandas de Bollinger, Cruce EMA, Oscilador EstocÃ¡stico.
     Umbrales RSI configurables por el usuario.
     """
     tickers   = [t.upper() for t in tickers]
     invalidos = [t for t in tickers if t not in CATALOGO]
     if invalidos:
-        raise HTTPException(status_code=404, detail=f"Tickers no válidos: {invalidos}")
+        raise HTTPException(status_code=404, detail=f"Tickers no vÃ¡lidos: {invalidos}")
     try:
         resultado = generar_alertas_portafolio(
             tickers,
             fecha_inicio,
-            rsi_sobrecompra=rsi_sobrecompra,   # ← ahora se pasan al servicio
+            rsi_sobrecompra=rsi_sobrecompra,   # â† ahora se pasan al servicio
             rsi_sobreventa=rsi_sobreventa,
         )
         resultado["umbrales_usados"] = {
@@ -647,21 +651,19 @@ async def obtener_macro(
         default=["DGS3MO", "DGS10", "CPIAUCSL", "UNRATE", "FEDFUNDS", "VIXCLS"],
         description="Series FRED a consultar",
     ),
-    macro: dict = Depends(get_macro_data),   # ← Depends() conectado
 ) -> dict:
     """
     Indicadores macroeconómicos actualizados vía FRED API.
-    Incluye: tasa libre de riesgo (T-Bills 3M), inflación CPI,
-    desempleo, tasa Fed, y VIX. Requiere FRED_API_KEY en .env.
     """
-    return macro
+    settings = get_settings()
+    from app.services.macro import obtener_datos_fred
+    return obtener_datos_fred(api_key=settings.fred_api_key, series=series)
 
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# CAPA 3 â€” RENTA FIJA, DERIVADOS Y STRESS TESTING
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CAPA 3 — RENTA FIJA, DERIVADOS Y STRESS TESTING
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/curva-rendimiento", tags=["Capa 3 — Renta Fija y Derivados ★"])
+@app.get("/curva-rendimiento", tags=["Capa 3 â€” Renta Fija y Derivados â˜…"])
 async def obtener_curva_rendimiento() -> dict:
     """
     Curva de tesoros US desde FRED (6 vencimientos) + ajuste Nelson-Siegel.
@@ -710,11 +712,11 @@ async def obtener_curva_rendimiento() -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/bono/duracion", tags=["Capa 3 — Renta Fija y Derivados ★"])
+@app.post("/bono/duracion", tags=["Capa 3 â€” Renta Fija y Derivados â˜…"])
 async def calcular_duracion_bono(req: BonoRequest) -> dict:
     """
-    Duración Macaulay, duración modificada y convexidad.
-    Sensibilidad ante shocks ±50, ±100, ±200 pb (3 aproximaciones).
+    DuraciÃ³n Macaulay, duraciÃ³n modificada y convexidad.
+    Sensibilidad ante shocks Â±50, Â±100, Â±200 pb (3 aproximaciones).
     """
     try:
         return calcular_bono(
@@ -727,12 +729,12 @@ async def calcular_duracion_bono(req: BonoRequest) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/opcion/precio", tags=["Capa 3 — Renta Fija y Derivados ★"])
+@app.post("/opcion/precio", tags=["Capa 3 â€” Renta Fija y Derivados â˜…"])
 async def calcular_opcion(req: OpcionRequest) -> dict:
     """
     Black-Scholes para call y put europeas.
-    Retorna: precio, d1, d2, las 5 Greeks (Δ, Γ, ν, Θ, ρ),
-    verificación de paridad put-call y volatilidad implícita.
+    Retorna: precio, d1, d2, las 5 Greeks (Î”, Î“, Î½, Î˜, Ï),
+    verificaciÃ³n de paridad put-call y volatilidad implÃ­cita.
     """
     try:
         resultado = black_scholes(req.S, req.K, req.T, req.r, req.sigma, req.tipo)
@@ -745,15 +747,15 @@ async def calcular_opcion(req: OpcionRequest) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/stress", tags=["Capa 3 — Renta Fija y Derivados ★"])
+@app.post("/stress", tags=["Capa 3 â€” Renta Fija y Derivados â˜…"])
 async def stress_test(req: StressRequest) -> dict:
     """
-    Stress testing con 3 escenarios: shock de tasa ±200pb,
-    caída de mercado -20%/-30%, volatilidad ×2 + escenario combinado.
+    Stress testing con 3 escenarios: shock de tasa Â±200pb,
+    caÃ­da de mercado -20%/-30%, volatilidad Ã—2 + escenario combinado.
     """
     invalidos = [t for t in req.tickers if t not in CATALOGO]
     if invalidos:
-        raise HTTPException(status_code=404, detail=f"Tickers no válidos: {invalidos}")
+        raise HTTPException(status_code=404, detail=f"Tickers no vÃ¡lidos: {invalidos}")
     try:
         return stress_testing(
             tickers=req.tickers, pesos=req.pesos,
@@ -764,17 +766,17 @@ async def stress_test(req: StressRequest) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CAPA 4 — MACHINE LEARNING
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# CAPA 4 â€” MACHINE LEARNING
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-@app.post("/predict", response_model=PredictResponse, tags=["Capa 4 — ML ★★"])
+@app.post("/predict", response_model=PredictResponse, tags=["Capa 4 â€” ML â˜…â˜…"])
 async def predecir(
     req: PredictRequest,
     predictor=Depends(get_predictor) if ML_DISPONIBLE else None,
 ) -> dict:
     """
-    Predicción de régimen de mercado (alcista/lateral/bajista) con RandomForest.
+    PredicciÃ³n de rÃ©gimen de mercado (alcista/lateral/bajista) con RandomForest.
     Features: [rsi_14, macd_hist, ewma_vol, ret_5d, ret_21d, pct_b_bollinger, estocastico_k]
     """
     if not ML_DISPONIBLE:
@@ -784,7 +786,7 @@ async def predecir(
     try:
         X    = np.array(req.features).reshape(1, -1)
         pred = float(predictor.predict(X)[0])
-        label_map = {1.0: "Alcista 📈", 0.0: "Lateral ➡️", -1.0: "Bajista 📉"}
+        label_map = {1.0: "Alcista ðŸ“ˆ", 0.0: "Lateral âž¡ï¸", -1.0: "Bajista ðŸ“‰"}
         return PredictResponse(
             ticker=req.ticker.upper(),
             prediction=pred,
@@ -796,9 +798,9 @@ async def predecir(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/predict/status", tags=["Capa 4 — ML ★★"])
+@app.get("/predict/status", tags=["Capa 4 â€” ML â˜…â˜…"])
 async def estado_modelo() -> dict:
-    """Estado del modelo ML: versión, disponibilidad, features esperadas."""
+    """Estado del modelo ML: versiÃ³n, disponibilidad, features esperadas."""
     if not ML_DISPONIBLE:
         return {"disponible": False, "mensaje": "Ejecuta: python -m app.ml.train"}
     try:
@@ -813,21 +815,21 @@ async def estado_modelo() -> dict:
         return {"disponible": False, "error": str(e)}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# COMPARACIÓN Y RECOMENDACIONES
-# ═══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# COMPARACIÃ“N Y RECOMENDACIONES
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-@app.get("/comparar", tags=["Comparación"])
+@app.get("/comparar", tags=["ComparaciÃ³n"])
 async def comparar(
     tickers:      List[str]    = Query(default=ACTIVOS_README),
     fecha_inicio: str          = Query(default="2022-01-01"),
     fecha_fin:    Optional[str]= Query(default=None),
 ) -> dict:
-    """Comparación multi-activo: rendimiento acumulado vs. benchmark + métricas."""
+    """ComparaciÃ³n multi-activo: rendimiento acumulado vs. benchmark + mÃ©tricas."""
     tickers   = [t.upper() for t in tickers]
     invalidos = [t for t in tickers if t not in CATALOGO]
     if invalidos:
-        raise HTTPException(status_code=404, detail=f"Tickers no válidos: {invalidos}")
+        raise HTTPException(status_code=404, detail=f"Tickers no vÃ¡lidos: {invalidos}")
     if len(tickers) < 2:
         raise HTTPException(status_code=400, detail="Se necesitan al menos 2 tickers.")
     try:
@@ -836,14 +838,14 @@ async def comparar(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/recomendar", tags=["Comparación"])
+@app.get("/recomendar", tags=["ComparaciÃ³n"])
 async def recomendar(
     perfil_riesgo: str           = Query(default="moderado"),
     region:        Optional[str] = Query(default=None),
     sector:        Optional[str] = Query(default=None),
     fecha_inicio:  str           = Query(default="2022-01-01"),
 ) -> dict:
-    """Recomienda portafolio según perfil de riesgo (conservador/moderado/agresivo)."""
+    """Recomienda portafolio segÃºn perfil de riesgo (conservador/moderado/agresivo)."""
     if perfil_riesgo not in ["conservador", "moderado", "agresivo"]:
         raise HTTPException(
             status_code=400,

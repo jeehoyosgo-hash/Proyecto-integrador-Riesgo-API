@@ -148,6 +148,11 @@ app_ui = ui.page_fluid(
                         ui.column(6, ui.div(ui.tags.p("RSI (14)", class_="card-title"), ui.output_ui("ind_rsi"), class_="card")),
                         ui.column(6, ui.div(ui.tags.p("MACD + Histograma", class_="card-title"), ui.output_ui("ind_macd"), class_="card")),
                     ),
+                    ui.div(
+                        ui.tags.p("Distribucion de rendimientos logaritmicos", class_="card-title"),
+                        ui.output_ui("ind_hist_rend"),
+                        class_="card",
+                    ),
                 ),
             ),
         ),
@@ -161,11 +166,11 @@ app_ui = ui.page_fluid(
                         ui.input_text("r_tickers", "Tickers (coma)", value=TICKERS_STR),
                         ui.input_text("r_pesos",   "Pesos (coma)",   value=PESOS_DEFAULT),
                         ui.input_slider("r_conf", "Confianza VaR", 0.90, 0.99, 0.95, step=0.01),
-                        ui.input_select("r_tipo", "Análisis", choices={
-                            "var":        "VaR & CVaR + Kupiec",
-                            "capm":       "CAPM & Beta",
-                            "markowitz":  "Markowitz QP",
-                            "volatilidad":"Volatilidad EWMA + GARCH",
+                        ui.input_select("r_tipo", "Analisis", choices={
+                            "var":          "VaR & CVaR + Kupiec",
+                            "capm":         "CAPM & Beta",
+                            "markowitz":    "Markowitz QP",
+                            "volatilidad":  "Volatilidad EWMA + GARCH",
                         }),
                         ui.input_action_button("r_btn", "Calcular", class_="btn-primary"),
                         class_="card",
@@ -480,6 +485,79 @@ def server(input, output, session):
         except Exception as e:
             return ui.tags.p(str(e), style="color:#f87171;font-size:11px")
 
+    @output
+    @render.ui
+    def ind_hist_rend():
+        data, err = _ind()
+        if err or data is None: return ui.tags.p(err or "Sin datos", style="color:#64748b;font-size:12px")
+        try:
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            import numpy as np
+            from scipy import stats
+
+            df = pd.DataFrame(data.get("datos", [])).dropna(subset=["cierre"])
+            if len(df) < 10:
+                return ui.tags.p("Insuficientes datos para histograma", style="color:#64748b;font-size:11px")
+
+            precios = df["cierre"].astype(float)
+            rend_log = np.log(precios / precios.shift(1)).dropna()
+
+            mu  = float(rend_log.mean())
+            sig = float(rend_log.std())
+
+            fig = go.Figure()
+            # Histograma
+            fig.add_trace(go.Histogram(
+                x=rend_log,
+                nbinsx=50,
+                name="Rendimientos",
+                marker_color="#60a5fa",
+                opacity=0.7,
+                histnorm="probability density",
+            ))
+            # Curva normal superpuesta
+            x_range = np.linspace(rend_log.min(), rend_log.max(), 200)
+            y_norm  = stats.norm.pdf(x_range, mu, sig)
+            fig.add_trace(go.Scatter(
+                x=x_range, y=y_norm,
+                mode="lines", name=f"Normal(mu={mu:.4f}, sig={sig:.4f})",
+                line=dict(color="#E76F51", width=2),
+            ))
+            # Líneas VaR 95% y 99%
+            var95 = mu + stats.norm.ppf(0.05) * sig
+            var99 = mu + stats.norm.ppf(0.01) * sig
+            fig.add_vline(x=var95, line_color="#F4A261", line_dash="dash",
+                          annotation_text="VaR 95%", annotation_font_color="#F4A261")
+            fig.add_vline(x=var99, line_color="#f87171", line_dash="dash",
+                          annotation_text="VaR 99%", annotation_font_color="#f87171")
+
+            # Estadísticas en anotación
+            kurt = float(rend_log.kurtosis())
+            skew = float(rend_log.skew())
+            fig.add_annotation(
+                x=0.02, y=0.97, xref="paper", yref="paper",
+                text=f"Kurt: {kurt:.2f} | Skew: {skew:.2f}<br>Media: {mu*100:.4f}% | Vol: {sig*100:.4f}%",
+                showarrow=False, align="left",
+                font=dict(size=10, color="#94a3b8"),
+                bgcolor="#1e293b", bordercolor="#334155", borderwidth=1,
+            )
+            fig.update_layout(
+                height=260,
+                paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
+                font=dict(color="#94a3b8", size=11),
+                legend=dict(orientation="h", y=-0.2, bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+                margin=dict(t=20, b=60, l=50, r=10),
+                xaxis_title="Rendimiento logaritmico diario",
+                yaxis_title="Densidad",
+                bargap=0.02,
+            )
+            fig.update_xaxes(gridcolor="#2d3748")
+            fig.update_yaxes(gridcolor="#2d3748")
+            return ui.HTML(pio.to_html(fig, include_plotlyjs=False, full_html=False))
+        except Exception as e:
+            return ui.tags.p(str(e), style="color:#f87171;font-size:11px")
+
     # ════════════════════════════════════════════════════
     # TAB 2 — RIESGO
     # ════════════════════════════════════════════════════
@@ -607,10 +685,70 @@ def server(input, output, session):
 
         rf    = fmt_pct(data.get("tasa_libre_riesgo_anual"))
         prima = fmt_pct(data.get("prima_riesgo_mercado") or data.get("prima_riesgo_mercado_pct"))
+
+        # Gráfico dispersión Beta — datos sintéticos de regresión por activo
+        try:
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            import numpy as np
+            fig_capm = go.Figure()
+            beta_vals = []
+            er_vals   = []
+            tickers_list = []
+            for t, d in activos.items():
+                b  = float(d.get("beta") or 0)
+                er = float(d.get("rendimiento_esperado_capm") or 0)
+                vol = float(d.get("volatilidad_anual") or 0)
+                beta_vals.append(b)
+                er_vals.append(er * 100)
+                tickers_list.append(t)
+                fig_capm.add_trace(go.Scatter(
+                    x=[b], y=[er * 100],
+                    mode="markers+text",
+                    name=t,
+                    text=[t],
+                    textposition="top center",
+                    marker=dict(size=10 + vol * 30),
+                    hovertemplate=f"<b>{t}</b><br>Beta: {b:.4f}<br>E(R): {er*100:.2f}%<br>Vol: {vol*100:.1f}%<extra></extra>"
+                ))
+            # Línea SML (Security Market Line)
+            rf_val  = float(data.get("tasa_libre_riesgo_anual") or 0.0364) * 100
+            prima_v = float(data.get("prima_riesgo_mercado") or -0.06) * 100
+            b_range = [min(beta_vals) - 0.05, max(beta_vals) + 0.05]
+            sml_y   = [rf_val + b * prima_v for b in b_range]
+            fig_capm.add_trace(go.Scatter(
+                x=b_range, y=sml_y,
+                mode="lines", name="SML",
+                line=dict(color="#475569", width=1.5, dash="dot"),
+                showlegend=True
+            ))
+            fig_capm.add_vline(x=0, line_color="#334155", line_width=1)
+            fig_capm.add_hline(y=rf_val, line_color="#334155", line_width=1,
+                               annotation_text=f"Rf={rf_val:.2f}%", annotation_font_color="#64748b")
+            fig_capm.update_layout(
+                height=320,
+                paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
+                font=dict(color="#94a3b8", size=11),
+                xaxis_title="Beta (riesgo sistematico)",
+                yaxis_title="E(R) CAPM (%)",
+                legend=dict(orientation="h", y=-0.2, bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+                margin=dict(t=20, b=60, l=50, r=10),
+                showlegend=True,
+            )
+            fig_capm.update_xaxes(gridcolor="#2d3748")
+            fig_capm.update_yaxes(gridcolor="#2d3748")
+            capm_chart_html = pio.to_html(fig_capm, include_plotlyjs=False, full_html=False)
+        except Exception as e:
+            capm_chart_html = f"<p style='color:#f87171;font-size:11px'>Error grafico: {e}</p>"
+
         return ui.div(
             ui.tags.p(f"Benchmark: {data.get('benchmark','SPY')} | Rf: {rf} | Prima mercado: {prima}",
                       style="color:#94a3b8;font-size:12px;margin-bottom:10px"),
             ui.HTML(tabla_html),
+            ui.tags.hr(style="margin:16px 0"),
+            ui.tags.p("Security Market Line (SML) — Beta vs E(R) CAPM", class_="card-title"),
+            ui.tags.p("Tamano del punto = volatilidad anual del activo", style="color:#64748b;font-size:11px;margin-bottom:6px"),
+            ui.HTML(capm_chart_html),
         )
 
 
@@ -662,9 +800,121 @@ def server(input, output, session):
             </div>
         </div>"""
 
+        # Heatmap de correlación + nube de portafolios
+        try:
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            import numpy as np
+            from plotly.subplots import make_subplots
+
+            tickers_list = list((ms.get("pesos") or mv.get("pesos") or {}).keys())
+            sim = data.get("simulacion", {})
+            vols_sim  = sim.get("volatilidades", [])
+            rets_sim  = sim.get("retornos", [])
+            sharpes_sim = sim.get("sharpes", [])
+            frontera  = data.get("frontera_eficiente", [])
+
+            # ── Subplot: nube + frontera (izquierda) | heatmap correlación (derecha)
+            fig_m = make_subplots(
+                rows=1, cols=2,
+                subplot_titles=["Conjunto factible y frontera eficiente", "Correlacion entre activos"],
+                column_widths=[0.55, 0.45],
+                horizontal_spacing=0.08,
+            )
+
+            # Nube de portafolios simulados
+            if vols_sim and rets_sim:
+                n = min(len(vols_sim), len(rets_sim), len(sharpes_sim)) if sharpes_sim else min(len(vols_sim), len(rets_sim))
+                colors_sim = sharpes_sim[:n] if sharpes_sim else [0] * n
+                fig_m.add_trace(go.Scatter(
+                    x=[v*100 for v in vols_sim[:n]],
+                    y=[r*100 for r in rets_sim[:n]],
+                    mode="markers",
+                    marker=dict(size=3, color=colors_sim, colorscale="Viridis",
+                                showscale=True, colorbar=dict(title="Sharpe", x=0.52, len=0.8)),
+                    name="Portafolios simulados",
+                    hovertemplate="Vol: %{x:.1f}%<br>Ret: %{y:.1f}%<extra></extra>",
+                    showlegend=False,
+                ), row=1, col=1)
+
+            # Frontera eficiente
+            if frontera:
+                fv = [p["volatilidad"]*100 for p in frontera]
+                fr = [p["retorno"]*100 for p in frontera]
+                fig_m.add_trace(go.Scatter(
+                    x=fv, y=fr, mode="lines",
+                    line=dict(color="#2A9D8F", width=2.5),
+                    name="Frontera eficiente",
+                ), row=1, col=1)
+
+            # Portafolio max Sharpe
+            ms_v = float(ms.get("volatilidad_anual") or 0) * 100
+            ms_r = float(ms.get("retorno_anual") or 0) * 100
+            mv_v = float(mv.get("volatilidad_anual") or 0) * 100
+            mv_r = float(mv.get("retorno_anual") or 0) * 100
+            fig_m.add_trace(go.Scatter(
+                x=[ms_v], y=[ms_r], mode="markers+text",
+                text=["Max Sharpe"], textposition="top right",
+                marker=dict(size=12, color="#E76F51", symbol="star"),
+                name="Max Sharpe",
+            ), row=1, col=1)
+            fig_m.add_trace(go.Scatter(
+                x=[mv_v], y=[mv_r], mode="markers+text",
+                text=["Min Var"], textposition="top right",
+                marker=dict(size=12, color="#F4A261", symbol="diamond"),
+                name="Min Varianza",
+            ), row=1, col=1)
+
+            # Heatmap correlación — llamar /comparar para obtener matriz real
+            corr_matrix = None
+            if tickers_list:
+                try:
+                    comp_data, _ = api_get("/comparar", {
+                        "tickers": tickers_list,
+                        "fecha_inicio": "2022-01-01"
+                    })
+                    if comp_data:
+                        corr_matrix = comp_data.get("matriz_correlacion")
+                except Exception:
+                    pass
+
+            if corr_matrix and tickers_list:
+                z_vals = [[float(corr_matrix.get(t1, {}).get(t2, 0) or 0) for t2 in tickers_list] for t1 in tickers_list]
+            else:
+                n = len(tickers_list)
+                z_vals = [[1.0 if i==j else 0.3 for j in range(n)] for i in range(n)]
+
+            if tickers_list:
+                fig_m.add_trace(go.Heatmap(
+                    z=z_vals,
+                    x=tickers_list, y=tickers_list,
+                    colorscale="RdBu", zmid=0, zmin=-1, zmax=1,
+                    text=[[f"{v:.2f}" for v in row] for row in z_vals],
+                    texttemplate="%{text}",
+                    textfont=dict(size=9),
+                    showscale=True,
+                    colorbar=dict(title="r", x=1.01, len=0.8),
+                ), row=1, col=2)
+
+            fig_m.update_layout(
+                height=360,
+                paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
+                font=dict(color="#94a3b8", size=10),
+                legend=dict(orientation="h", y=-0.18, bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+                margin=dict(t=40, b=60, l=50, r=60),
+            )
+            fig_m.update_xaxes(gridcolor="#2d3748")
+            fig_m.update_yaxes(gridcolor="#2d3748")
+            mko_html = pio.to_html(fig_m, include_plotlyjs=False, full_html=False)
+        except Exception as e:
+            mko_html = f"<p style='color:#f87171;font-size:11px'>Error grafico: {e}</p>"
+
         return ui.div(
             ui.tags.p("Frontera eficiente — Programacion Cuadratica (sin ventas en corto)", class_="card-title"),
             ui.HTML(html),
+            ui.tags.hr(style="margin:16px 0"),
+            ui.tags.p("Conjunto factible, frontera eficiente y correlaciones", class_="card-title"),
+            ui.HTML(mko_html),
         )
 
 
@@ -840,23 +1090,31 @@ def server(input, output, session):
                 ui.column(3, ui.div(ui.tags.p("d₂", class_="card-title"), ui.tags.p(f"{data.get('d2',0):.4f}", class_="metric-big"))),
                 ui.column(3, ui.div(
                     ui.tags.p("Paridad put-call", class_="card-title"),
-                    ui.tags.p("✅ Verificada" if paridad.get("verificada") else "❌ Error",
+                    ui.tags.p("Verificada" if paridad.get("verificada") else "Error",
                               style=f"color:{'#34d399' if paridad.get('verificada') else '#f87171'};font-weight:600"),
                     ui.tags.p(f"Error numérico: {paridad.get('error_numerico','—'):.2e}", style="color:#64748b;font-size:11px"),
                 )),
             ),
             ui.tags.hr(),
             ui.tags.p("Las 5 Greeks", class_="card-title"),
-            ui.tags.table(
-                ui.tags.thead(ui.tags.tr(*[ui.tags.th(h) for h in ["Greek","Símbolo","Valor","Interpretación"]])),
-                ui.tags.tbody(*[
-                    ui.tags.tr(
-                        ui.tags.td(n.title()), ui.tags.td(sym),
-                        ui.tags.td(ui.HTML(f'<span style="color:#60a5fa;font-weight:600">{g.get(n,"—"):.6f}</span>')),
-                        ui.tags.td(interp.get(n,"—"), style="font-size:11px;color:#94a3b8"),
-                    ) for n, sym in [("delta","Δ"),("gamma","Γ"),("vega","ν"),("theta","Θ"),("rho","ρ")]
-                ]),
-            ),
+            ui.HTML(f"""
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead><tr style="background:#1e293b">
+                    <th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px">GREEK</th>
+                    <th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px">SIMBOLO</th>
+                    <th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px">VALOR</th>
+                    <th style="color:#94a3b8;padding:9px 12px;text-align:left;font-size:11px">INTERPRETACION</th>
+                </tr></thead>
+                <tbody>
+                    {"".join(
+                        f'<tr><td style="color:#e2e8f0;padding:9px 12px;font-weight:500">{n.title()}</td>'
+                        f'<td style="color:#a78bfa;padding:9px 12px;font-size:16px">{sym}</td>'
+                        f'<td style="color:#60a5fa;padding:9px 12px;font-weight:600;font-family:monospace">{float(g.get(n) or 0):.6f}</td>'
+                        f'<td style="color:#94a3b8;padding:9px 12px;font-size:11px">{str(interp.get(n,"—"))}</td></tr>'
+                        for n, sym in [("delta","d"),("gamma","G"),("vega","v"),("theta","T"),("rho","r")]
+                    )}
+                </tbody>
+            </table>"""),
         )
 
     @reactive.calc
@@ -922,7 +1180,7 @@ def server(input, output, session):
         if not data: return ui.tags.p("Sin estado", style="color:#64748b;font-size:12px")
         disp = data.get("disponible", False)
         return ui.div(
-            ui.tags.p("✅ Modelo cargado" if disp else "⚠️ Modelo no disponible",
+            ui.tags.p("Modelo cargado" if disp else "Modelo no disponible",
                       style=f"color:{'#34d399' if disp else '#f59e0b'};font-weight:600"),
             ui.tags.p(f"Versión: {data.get('model_version','—')}", style="color:#94a3b8;font-size:11px"),
             ui.tags.p(f"Singleton ID: {data.get('singleton_id','—')}", style="color:#64748b;font-size:10px"),
@@ -1014,14 +1272,37 @@ def server(input, output, session):
                 class_="card",
             )))
         ctx = data.get("contexto_macro", {})
+        # Construir cards como HTML puro (ui.row(*cards) falla con lista Python en Shiny)
+        cards_html = ""
+        for serie, info in datos.items():
+            if serie.startswith("_"): continue
+            valor = info.get("valor")
+            label = iconos.get(serie, "[?]")
+            nombre = str(info.get("nombre", serie))
+            fecha  = str(info.get("fecha", "—"))
+            interp = str(info.get("interpretacion", ""))
+            val_str = f"{valor:.2f}%" if valor is not None else "—"
+            cards_html += f"""
+            <div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:12px;padding:16px;margin-bottom:12px">
+                <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:6px">{label} {nombre}</p>
+                <p style="font-family:monospace;font-size:26px;font-weight:700;color:#60a5fa;margin:4px 0">{val_str}</p>
+                <p style="color:#64748b;font-size:11px">{fecha}</p>
+                <p style="color:#94a3b8;font-size:11px;margin-top:4px">{interp}</p>
+            </div>"""
+        impacto_html = "".join(
+            f'<p style="color:#60a5fa;font-size:12px;margin:4px 0">→ {i}</p>'
+            for i in ctx.get("impacto_portafolio", [])
+        )
         return ui.div(
-            ui.row(*cards),
-            ui.div(
-                ui.tags.p("Contexto macro integrado", class_="card-title"),
-                ui.tags.p(ctx.get("descripcion",""), style="color:#94a3b8;font-size:13px"),
-                *[ui.tags.p(f"→ {i}", style="color:#60a5fa;font-size:12px") for i in ctx.get("impacto_portafolio",[])],
-                class_="card",
-            ),
+            ui.HTML(f"""
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+                {cards_html}
+            </div>
+            <div style="background:#1a1f2e;border:1px solid #2d3748;border-radius:12px;padding:16px">
+                <p style="font-size:11px;font-weight:600;text-transform:uppercase;color:#94a3b8;margin-bottom:8px">CONTEXTO MACRO INTEGRADO</p>
+                <p style="color:#94a3b8;font-size:13px;margin-bottom:8px">{str(ctx.get("descripcion",""))}</p>
+                {impacto_html}
+            </div>"""),
         )
 
     @reactive.calc
@@ -1069,10 +1350,51 @@ def server(input, output, session):
             </tr></thead>
             <tbody>{filas_comp}</tbody>
         </table>"""
+        # Gráfico rendimiento acumulado base 100
+        try:
+            import plotly.graph_objects as go
+            import plotly.io as pio
+            import numpy as np
+            fig_comp = go.Figure()
+            colors_line = ["#2A9D8F","#E76F51","#F4A261","#60a5fa","#a78bfa","#34d399","#f59e0b","#f87171"]
+            for i, (ticker, d) in enumerate(sorted(comp.items(), key=lambda x: x[1].get("sharpe_ratio") or 0, reverse=True)):
+                hist = d.get("retornos_acumulados_base100") or d.get("precio_base100")
+                fechas_h = d.get("fechas_acumulado") or d.get("fechas")
+                if hist and fechas_h and len(hist) == len(fechas_h):
+                    color = colors_line[i % len(colors_line)]
+                    ret_total = float(d.get("retorno_total") or 0)
+                    fig_comp.add_trace(go.Scatter(
+                        x=fechas_h, y=hist,
+                        mode="lines", name=f"{ticker} ({ret_total*100:+.1f}%)",
+                        line=dict(color=color, width=1.8),
+                        hovertemplate=f"<b>{ticker}</b><br>%{{x}}<br>Base 100: %{{y:.1f}}<extra></extra>",
+                    ))
+            if fig_comp.data:
+                fig_comp.add_hline(y=100, line_color="#334155", line_width=1,
+                                   line_dash="dot", annotation_text="Base 100")
+                fig_comp.update_layout(
+                    height=300,
+                    paper_bgcolor="#1a1f2e", plot_bgcolor="#1a1f2e",
+                    font=dict(color="#94a3b8", size=11),
+                    yaxis_title="Rendimiento acumulado (base 100)",
+                    legend=dict(orientation="h", y=-0.22, bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
+                    margin=dict(t=20, b=70, l=50, r=10),
+                )
+                fig_comp.update_xaxes(gridcolor="#2d3748")
+                fig_comp.update_yaxes(gridcolor="#2d3748")
+                comp_chart_html = pio.to_html(fig_comp, include_plotlyjs=False, full_html=False)
+            else:
+                comp_chart_html = "<p style='color:#64748b;font-size:11px'>Datos de rendimiento acumulado no disponibles en esta respuesta del backend.</p>"
+        except Exception as e:
+            comp_chart_html = f"<p style='color:#f87171;font-size:11px'>Error grafico acumulado: {e}</p>"
+
         return ui.div(
             ui.tags.p(f"Mejor Sharpe: {data.get('mejor_sharpe','—')} | Mayor retorno: {data.get('mejor_retorno','—')} | Menor vol: {data.get('menor_volatilidad','—')}",
                       style="color:#60a5fa;font-size:12px;font-weight:600;margin-bottom:10px"),
             ui.HTML(tabla_comp),
+            ui.tags.hr(style="margin:16px 0"),
+            ui.tags.p("Rendimiento acumulado base 100", class_="card-title"),
+            ui.HTML(comp_chart_html),
         )
 
 
